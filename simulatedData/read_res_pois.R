@@ -7,10 +7,10 @@ library(gridExtra)
 ######cnvergence params
 
 ##binom
-lim_sing<-1e-5 #maybe we will need to change this! this might over-estimate the prevalence, but since its zero for our methods it should be okish??
-#lim_sing<-sqrt(.Machine$double.eps) #this likely does not make sense
-lim_sing_rho<-1e-5 #for this we could reference Chung et al. 2015, but this would miss cases where ests of diags are zero.
-#lim_sing_s<--log(sqrt(.Machine$double.eps))
+lim_sing<-1e-5 
+
+lim_sing_rho<-1e-5 
+
 lim_sing_s<--log(sqrt(1e-5))
 
 
@@ -147,78 +147,9 @@ for (N in c(25,50)){
 split(df$na_fit,df$method) # always zero, hence no issue
 
 
-##get taus
-
-zz=0
-for (N in c(25,50)){
-  for (n in c(10,20)){
-    for (vr_int in c(0.01,0.1)){
-      for (mult in c(0.5,1.5)){
-        for (rh in c(0.5,0.8)){
-          mod="pois"
-          
-          
-          
-          
-          sd_int<-sqrt(vr_int)  
-          multiplier_int<-mult
-          
-          sd_slope<-sd_int*multiplier_int
-          
-          b0 <- -0.1
-          
-          # regression coefficients of fixed effects
-          betas <- c(0.17, -0.17, 0.17, 0.15, -0.05)
-          
-          
-          rho=rh
-          
-          # list of covariance matrices for random effects
-          corr_mat <-  matrix(c(sd_int**2, rho*sd_int*sd_slope, rho*sd_int*sd_slope, sd_slope**2), ncol = 2, nrow = 2) 
-          true_sig<-corr_mat
-          
-          sigma_eps=2
-          
-          alpha=0.05
-          
-          
-          nms<-paste("po",N,n,diag(corr_mat)[1],diag(corr_mat)[2],cov2cor(corr_mat)[1,2],sep="_")
-          
-          nmsfile<-paste0("pois/results/taus",nms,".txt")
-          
-          dd<-try(read.table(nmsfile,header=FALSE,sep="\t"),silent = TRUE)
-          
-          if (class(dd)!="try-error"){
-            zz=zz+1
-            
-            nsim<-nrow(dd)
-            
-            ddm<-as.matrix(dd)
-            
-            taus<-apply(ddm,2,mean)
-            
-            dfit<-data.frame(
-              N=N,n=n,vr_int=vr_int,mult=mult,rho=rh,
-              
-              tauml= taus[1],
-              
-              taoracle=taus[1],nsim=nsim
-            )
-            
-            if (zz==1) dft<-dfit else dft<-rbind(dft,dfit)
-            
-          }
-          
-          
-        }
-      }
-    }}}
-
-
 
  
-#txt1<-expression(sigma[1]^2)
-#txt2<-expression(sigma[2]^2)
+
 txt1<-"sigma[0]^2"
 txt2<-"sigma[1]^2"
 
@@ -276,7 +207,6 @@ for (N in c(25,50)){
 
 #rename methods as in paper
 
-##rename methods as in paper!
 df$method<-as.character(df$method)
 
 df$method[df$method=="ml"]<-"ML"
