@@ -6,10 +6,10 @@ library(gridExtra)
 ######cnvergence params
 
 ##binom
-lim_sing<-1e-5 #maybe we will need to change this! this might over-estimate the prevalence, but since its zero for our methods it should be okish??
-#lim_sing<-sqrt(.Machine$double.eps) #this likely does not make sense
-lim_sing_rho<-1e-5 #for this we could reference Chung et al. 2015, but this would miss cases where ests of diags are zero.
-#lim_sing_s<--log(sqrt(.Machine$double.eps))
+lim_sing<-1e-5 
+
+lim_sing_rho<-1e-5 
+
 lim_sing_s<--log(sqrt(1e-5))
 
 
@@ -220,8 +220,6 @@ for (N in c(25,50)){
 
 
  
-#txt1<-expression(sigma[1]^2)
-#txt2<-expression(sigma[2]^2)
 txt1<-"sigma[0]^2"
 txt2<-"sigma[1]^2"
 
@@ -283,7 +281,6 @@ for (N in c(25,50)){
 
 #rename methods as in paper
 
-##rename methods as in paper!
 df$method<-as.character(df$method)
 
 df$method[df$method=="ml"]<-"ML"
