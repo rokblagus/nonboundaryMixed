@@ -16,7 +16,10 @@ library(car)
 
 library(merDeriv)  
 
- 
+library(haven)
+
+library(tidyverse)
+
 
 ###aux functions for creating PD
 
@@ -114,6 +117,397 @@ make_pseudo_data_rand_eigen_inter_alpha_beta<-function(alpha,beta,param="psi",co
 #########################
 
 #########################
+
+
+#####Linear example, ANES data
+
+mydata = read_dta("anes2004TS.dta")
+
+
+shrunk0 = mydata %>% 
+  dplyr::select(V043250,
+                V041109a, # 1=male, 2=female
+                V043254, # 3-7: higher=1
+                V043247, # 2=Christian
+                V043299, # 10=black, 50=white, other
+                V043086, # 1=liberal
+                V043143, # 1-2=very important defense
+                V043186, # death
+                V043114, # 1=rep, 2=dem, 3=indep
+                V043132, # Iraq war
+                V043038, # feeling thermometer Bush
+                V041201
+  )
+
+shrunk2 = shrunk0 %>% 
+  transmute(age=V043250,
+            gender=ifelse(V041109a==1,1,0), # 1=male, 2=female
+            educ=ifelse(V043254>=4,1,0), # 3-7: higher=1
+            christian= ifelse(V043247%in%c(1,2,3),1,ifelse(V043247%in%c(0),NA,0)), # 2=Christian (NA/RF/DK = missing)
+            black=ifelse(V043299<20,1,0), # 10=black, 50=white, other
+            other=ifelse(V043299%in%c(20,23,24,25,30,34,35,40,45,70,88,89),1,0), # 10=black, 50=white, other (88-DK dontknow,89-RF refused)
+            liberal=ifelse(V043086==1,1,0), # 1=liberal (7-refused, 8-dont know)
+            defence=ifelse(V043143%in%c(1,2),1,0), # 1-2=very important defense (8-DK dontknow,9-RF refused)
+            death=ifelse(V043186==1,1,0), # 1-death penalty favor, (8-DK dontknow,9-RF refused)
+            democrat=ifelse(V043114==2,1,0), # 1=rep, 2=dem, 3=indep (4=other,5=noPref,8-DK dontknow,9-RF refused)
+            indep=ifelse(V043114>=3,1,0), # 1=rep, 2=dem, 3=indep (4=other,5=noPref,8-DK dontknow,9-RF refused)
+            Iraq=ifelse(V043132==1,1,0), # Iraq war 1=approve, 5=disapprove (8-DK dontknow,9-RF refused)
+            feeling=ifelse(V043038>100,NA,V043038), # missings
+            state=V041201 # exclude 5 with less than 19 people
+  )
+
+exclStates=names(sort(table(na.omit(shrunk2)$state))[1:5])
+
+shrunk2 = shrunk2 %>%
+  mutate(state=ifelse(state%in%exclStates,NA,state))
+
+## DATA TO WORK WITH
+shrunkF = na.omit(shrunk2) 
+shrunkF = shrunkF %>%
+  arrange(state) %>%
+  mutate(id = as.numeric(factor(state)))
+
+
+shrunkF<-as.data.frame(shrunkF)
+
+#fit<-glmmTMB( feeling~ age+educ+christian+black+other+liberal+defence+death+democrat+indep+Iraq+(-1+gender+christian+Iraq|id),data=shrunkF) 
+
+
+Y<-shrunkF$feeling
+X<-model.matrix(feeling~ age+educ+christian+black+other+liberal+defence+death+democrat+indep+Iraq,data=shrunkF)
+Z<-model.matrix(feeling~-1+gender+christian+Iraq,data=shrunkF)
+grouping<- shrunkF$id 
+
+xdf<-list(Y=Y,X=X,Z=Z,grouping=grouping)
+
+fit_glmer<-glmmTMB(Y~X-1 +
+                     (Z-1 | grouping), data = xdf,family = gaussian(link="identity"))
+
+
+fit_bglmer<-blmer(Y~X-1 +
+                    (Z-1 | grouping), data = xdf)
+
+
+fit_glmer_r<-glmmTMB(Y~X-1 +
+                       (Z-1 | grouping), data = xdf,family = gaussian(link="identity"),REML=TRUE)
+
+
+##using tau
+fiter_lin_tau<-function(tau,D_est,xdf){
+  q<-ncol(D_est)
+  ee<-eigen(D_est)
+  ee$values[ee$values<1e-4]<-1e-4
+  ee$values[ee$values>1e4]<-1e4
+  lm<-mean(ee$values)
+  li<-ee$values+tau*(lm-ee$values)
+  psi<-ee$vectors%*%diag(li)%*%t(ee$vectors)*3*q
+  
+  nu=2*q-1
+  
+  d2222<-make_pseudo_data_rand_eigen_general_psi_v3_glmm(psi=psi,nu=nu,const=1e8,param="variance",link_fun = function(x) x )
+  
+  
+  
+  Ya<-c(xdf$Y,d2222$data$Y)
+  Xa<-rbind(xdf$X,matrix(0,ncol=ncol(xdf$X),nrow=nrow(d2222$data$Z)))
+  Za<-rbind(xdf$Z,d2222$data$Z)
+  groupa<-c(xdf$grouping,max(xdf$grouping)+d2222$data$grouping)
+  weights<-c(rep(1,length(xdf$Y)),d2222$data$nn)
+  
+  xdfa<-list(Y=Ya,X=Xa,Z=Za,grouping=groupa,weights=weights)
+  
+  tmp2 <- glmmTMB(Y~-1+X+(-1+Z|grouping), family = gaussian(link = "identity"),
+                  dispformula = ~offset(-log(weights)),
+                  data=xdfa)
+  tmp2
+}
+
+get_marLik_lmm<-function(fited_model,xdf){
+  
+  tmp2<-fited_model
+  
+  tmp3<-glmmTMB(Y~-1+X+(-1+Z|grouping),data=xdf,family=gaussian(link = "identity"),
+                
+                start=list(beta=tmp2$sdr$par.fixed[which(names(tmp2$sdr$par.fixed)=="beta")],
+                           betad=tmp2$sdr$par.fixed[which(names(tmp2$sdr$par.fixed)=="betad")],
+                           theta=tmp2$sdr$par.fixed[which(names(tmp2$sdr$par.fixed)=="theta")]),
+                control = glmmTMBControl(optCtrl = list(iter.max=0, eval.max=0),rank_check ="skip",conv_check="skip")) #point estimates seem ok, but logLik is NA! They have a trick where they dont want to report loogLik if the model does not converge (which in our case defacto holds), but we can still accesss it via object$fit$objective which seems to give -loglik so it should be minimized
+  
+  
+  -tmp3$fit$objective
+  
+}
+
+tau_finder<-function(tau,xdf,D_est,fit_ml,alpha=0.05){
+  fit_tau<-fiter_lin_tau(tau,D_est,xdf)
+  abs(get_marLik_lmm(fit_tau,xdf)-get_marLik_lmm(fit_ml,xdf))-qchisq(1-alpha,1)/2
+}
+
+#ML
+D<-VarCorr(fit_glmer)$cond$group[1:3,1:3]
+
+sek<-seq(from=0,to=0.5,by=0.05)
+y<-rep(NA,length(sek))
+zz=0
+for (i in sek){
+  zz=zz+1
+  y[zz]<-tau_finder(i,xdf,VarCorr(fit_glmer)$cond$group[1:3,1:3],fit_glmer)
+}
+plot(sek,y,type="l")
+abline(h=0)
+
+opt_tau_ml<-uniroot(tau_finder,c(0,1),xdf=xdf,D_est=VarCorr(fit_glmer)$cond$group[1:3,1:3],
+                    fit_ml=fit_glmer,alpha=0.05)
+
+fit_tau_ml<-fiter_lin_tau(opt_tau_ml$root,D_est=VarCorr(fit_glmer)$cond$group[1:3,1:3],xdf=xdf)
+
+#get res, not correct, use Pois code!
+
+#BM
+
+mod<-fit_bglmer
+vv <- vcov(mod, full = TRUE)
+
+#fixef
+
+fixf<-paste(round(fixef(mod),3)," (", round(sqrt(diag(vv))[1:12],3),")",sep="")
+
+#ranef
+
+vr<-c(VarCorr(mod)$grouping)[-c(4,7,8)]
+
+
+vrv<-vv[-c(1:12,19),-c(1:12,19)]
+
+names(vr)<-colnames(vrv)<-rownames(vrv)<-c("sigma11","sigma12","sigma13","sigma22","sigma23","sigma33")
+
+s11<-deltaMethod(vr,"sqrt(sigma11)",vrv)
+s22<-deltaMethod(vr,"sqrt(sigma22)",vrv)
+s33<-deltaMethod(vr,"sqrt(sigma33)",vrv)
+r12<-deltaMethod(vr,"sigma12/sqrt(sigma11*sigma22)",vrv)
+r13<-deltaMethod(vr,"sigma13/sqrt(sigma11*sigma33)",vrv)
+r23<-deltaMethod(vr,"sigma23/sqrt(sigma33*sigma22)",vrv)
+
+rnf<-c(paste0(round(s11$Estimate,3)," (",round(s11$SE,3),")"),
+       paste0(round(s22$Estimate,3)," (",round(s22$SE,3),")"),
+       paste0(round(s33$Estimate,3)," (",round(s33$SE,3),")"),
+       paste0(round(r12$Estimate,3)," (",round(r12$SE,3),")"),
+       paste0(round(r13$Estimate,3)," (",round(r13$SE,3),")"),
+       paste0(round(r23$Estimate,3)," (",round(r23$SE,3),")")
+)
+
+
+#residual
+
+st<-summary(mod)$sigma**2
+vst<-vv[19,19]
+names(st)<-names(vst)<-"sigma1"
+
+s11<-deltaMethod(st,"sqrt(sigma1)",vst)
+
+rs<-paste0(round(s11$Estimate,3)," (",round(s11$SE,3),")")
+
+resi<-c(fixf,rnf,rs)
+
+res_bglmer<-resi
+
+
+
+
+#PML
+
+mod<-fit_tau_ml
+
+
+#for disp
+
+vr<-mod$sdr$cov.fixed[13,13]
+est<-mod$sdr$par.fixed[13]
+names(est)<-names(vr)<-"theta"
+
+s.r<-deltaMethod(est,"sqrt(exp(theta))",vr)
+
+
+
+#for 3rd RE
+#diags
+vr<-mod$sdr$cov.fixed[(7:9)+7,(7:9)+7]
+est<-mod$sdr$par.fixed[(7:9)+7]
+names(est)<-colnames(vr)<-rownames(vr)<-paste0("theta",1:3)
+
+s3.1<-deltaMethod(est,"exp(theta1)",vr)
+s3.2<-deltaMethod(est,"exp(theta2)",vr)
+s3.3<-deltaMethod(est,"exp(theta3)",vr)
+
+#off diags
+
+vr<-mod$sdr$cov.fixed[(10:12)+7,(10:12)+7]
+est<-mod$sdr$par.fixed[(10:12)+7]
+names(est)<-colnames(vr)<-rownames(vr)<-paste0("theta",0:2)
+
+s3.12<-deltaMethod(est,"theta0/sqrt(1+theta0^2)",vr)
+s3.13<-deltaMethod(est,"theta1/sqrt(theta1^2+theta2^2+1)",vr)
+s3.23<-deltaMethod(est,"(theta0*theta1+theta2)/sqrt(theta0^2+1)/sqrt(theta1^2+theta2^2+1)",vr)
+
+#fixef
+vr<-mod$sdr$cov.fixed[1:12,1:12]
+est<-mod$sdr$par.fixed[1:12]
+
+fxf<-paste0(round(est,3)," (",round(sqrt(diag(vr)),3),")")
+
+resi<-c(fxf,
+        
+        paste0(round(s3.1$Estimate,3)," (",round(s3.1$SE,3),")"),
+        paste0(round(s3.2$Estimate,3)," (",round(s3.2$SE,3),")"),
+        paste0(round(s3.3$Estimate,3)," (",round(s3.3$SE,3),")"),
+        
+        paste0(round(s3.12$Estimate,3)," (",round(s3.12$SE,3),")"),
+        paste0(round(s3.13$Estimate,3)," (",round(s3.13$SE,3),")"),
+        paste0(round(s3.23$Estimate,3)," (",round(s3.23$SE,3),")"),
+        
+        paste0(round(s.r$Estimate,3)," (",round(s.r$SE,3),")")
+)
+
+res_pml<-resi  
+
+
+#ML
+
+mod<-fit_glmer
+
+
+#for disp
+
+vr<-mod$sdr$cov.fixed[13,13]
+est<-mod$sdr$par.fixed[13]
+names(est)<-names(vr)<-"theta"
+
+s.r<-deltaMethod(est,"sqrt(exp(theta))",vr)
+
+
+
+#for 3rd RE
+#diags
+vr<-mod$sdr$cov.fixed[(7:9)+7,(7:9)+7]
+est<-mod$sdr$par.fixed[(7:9)+7]
+names(est)<-colnames(vr)<-rownames(vr)<-paste0("theta",1:3)
+
+s3.1<-deltaMethod(est,"exp(theta1)",vr)
+s3.2<-deltaMethod(est,"exp(theta2)",vr)
+s3.3<-deltaMethod(est,"exp(theta3)",vr)
+
+#off diags
+
+vr<-mod$sdr$cov.fixed[(10:12)+7,(10:12)+7]
+est<-mod$sdr$par.fixed[(10:12)+7]
+names(est)<-colnames(vr)<-rownames(vr)<-paste0("theta",0:2)
+
+s3.12<-deltaMethod(est,"theta0/sqrt(1+theta0^2)",vr)
+s3.13<-deltaMethod(est,"theta1/sqrt(theta1^2+theta2^2+1)",vr)
+s3.23<-deltaMethod(est,"(theta0*theta1+theta2)/sqrt(theta0^2+1)/sqrt(theta1^2+theta2^2+1)",vr)
+
+#fixef
+vr<-mod$sdr$cov.fixed[1:12,1:12]
+est<-mod$sdr$par.fixed[1:12]
+
+fxf<-paste0(round(est,3)," (",round(sqrt(diag(vr)),3),")")
+
+resi<-c(fxf,
+        
+        paste0(round(s3.1$Estimate,3)," (",round(s3.1$SE,3),")"),
+        paste0(round(s3.2$Estimate,3)," (",round(s3.2$SE,3),")"),
+        paste0(round(s3.3$Estimate,3)," (",round(s3.3$SE,3),")"),
+        
+        paste0(round(s3.12$Estimate,3)," (",round(s3.12$SE,3),")"),
+        paste0(round(s3.13$Estimate,3)," (",round(s3.13$SE,3),")"),
+        paste0(round(s3.23$Estimate,3)," (",round(s3.23$SE,3),")"),
+        
+        paste0(round(s.r$Estimate,3)," (",round(s.r$SE,3),")")
+)
+
+res_ml<-resi  
+
+#reml
+mod<-fit_glmer_r
+
+
+#for disp
+
+vr<-mod$sdr$cov.fixed[1,1]
+est<-mod$sdr$par.fixed[1]
+names(est)<-names(vr)<-"theta"
+
+s.r<-deltaMethod(est,"sqrt(exp(theta))",vr)
+
+
+
+#for 3rd RE
+#diags
+vr<-mod$sdr$cov.fixed[(2:4),(2:4)]
+est<-mod$sdr$par.fixed[(2:4)]
+names(est)<-colnames(vr)<-rownames(vr)<-paste0("theta",1:3)
+
+s3.1<-deltaMethod(est,"exp(theta1)",vr)
+s3.2<-deltaMethod(est,"exp(theta2)",vr)
+s3.3<-deltaMethod(est,"exp(theta3)",vr)
+
+#off diags
+
+vr<-mod$sdr$cov.fixed[(5:7),(5:7)]
+est<-mod$sdr$par.fixed[(5:7)]
+names(est)<-colnames(vr)<-rownames(vr)<-paste0("theta",0:2)
+
+s3.12<-deltaMethod(est,"theta0/sqrt(1+theta0^2)",vr)
+s3.13<-deltaMethod(est,"theta1/sqrt(theta1^2+theta2^2+1)",vr)
+s3.23<-deltaMethod(est,"(theta0*theta1+theta2)/sqrt(theta0^2+1)/sqrt(theta1^2+theta2^2+1)",vr)
+
+#fixef
+est<-fixef(mod)$cond
+vr<-vcov(mod)$cond
+
+fxf<-paste0(round(est,3)," (",round(sqrt(diag(vr)),3),")")
+
+resi<-c(fxf,
+        
+        paste0(round(s3.1$Estimate,3)," (",round(s3.1$SE,3),")"),
+        paste0(round(s3.2$Estimate,3)," (",round(s3.2$SE,3),")"),
+        paste0(round(s3.3$Estimate,3)," (",round(s3.3$SE,3),")"),
+        
+        paste0(round(s3.12$Estimate,3)," (",round(s3.12$SE,3),")"),
+        paste0(round(s3.13$Estimate,3)," (",round(s3.13$SE,3),")"),
+        paste0(round(s3.23$Estimate,3)," (",round(s3.23$SE,3),")"),
+        
+        paste0(round(s.r$Estimate,3)," (",round(s.r$SE,3),")")
+)
+
+res_reml<-resi  
+
+
+
+
+res<-cbind(res_ml,res_reml,res_bglmer, res_pml )
+colnames(res)<-c("ML","REML","BM", "PML" )
+
+vrnm<-c("Intercept","age","educ","christian","black","other","liberal",
+        "defence","death","democrat","indep","Iraq",
+        "State",rep("",6))
+
+res<-cbind(vrnm,res)
+
+
+rownm<-c("$\\beta_0$","$\\beta_1$","$\\beta_2$","$\\beta_3$","$\\beta_4$","$\\beta_5$","$\\beta_6$",
+         "$\\beta_7$","$\\beta_8$","$\\beta_9$","$\\beta_{10}$","$\\beta_{11}$",
+         "$\\sigma_1$","$\\sigma_2$","$\\sigma_3$",
+         "$\\rho_{12}$","$\\rho_{13}$","$\\rho_{23}$","$\\sigma_\\epsilon$")
+
+rownames(res)<-rownm
+res_lin<-res
+
+print(xtable(res),sanitize.text.function=function(x){x})
+
+
+
+
 
 ####poisson example 
 
@@ -442,7 +836,7 @@ resb<-c(res.bglmer[c(9:12,1:2)],res.s3.bml)
 
 res<-cbind(resm,resm_reml,resb[c(1:4,6,5,7:12)],resp2_ml)
 
-colnames(res)<-c("ML","REML","BM",paste0("PML(",round(opt_tau_ml$root,2),")"))
+colnames(res)<-c("ML","REML","BM","PML")
 
 nmr<-c("Intercept","Year$[$1996$]$","Year$[$1997$]$","Height","Brood","Index","Location",rep("",5))
 
@@ -457,315 +851,6 @@ res_pois<-res
 print(xtable(res),sanitize.text.function=function(x){x})
 
  
-
-
-
-######################
-
-######################
-
-
-####linear example: use aids data with log transformed Y
-
-
-data(aids, package = "JM")
-aids$CD4[aids$CD4==0]<-1e-8
-
-aids$CD4<-log(aids$CD4)
-
-
-
-
-
- 
-Y<-aids$CD4
-X<-model.matrix(CD4~gender+prevOI+AZT+obstime + drug + obstime:drug,data=aids)
-Z<-model.matrix(CD4~1 + obstime,data=aids)
-grouping<-as.numeric(as.factor(aids$patient))
-
-xdf<-list(Y=Y,X=X,Z=Z,grouping=grouping)
-
-fit_glmer<-glmmTMB(Y~X-1 +
-                     (Z-1 | grouping), data = xdf,family = gaussian(link="identity"))
-
-
-fit_bglmer<-blmer(Y~X-1 +
-                    (Z-1 | grouping), data = xdf)
-
-
-fit_glmer_r<-glmmTMB(Y~X-1 +
-                     (Z-1 | grouping), data = xdf,family = gaussian(link="identity"),REML=TRUE)
-
- 
-##using tau
-fiter_lin_tau<-function(tau,D_est,xdf){
-  q<-ncol(D_est)
-  ee<-eigen(D_est)
-  ee$values[ee$values<1e-4]<-1e-4
-  ee$values[ee$values>1e4]<-1e4
-  lm<-mean(ee$values)
-  li<-ee$values+tau*(lm-ee$values)
-  psi<-ee$vectors%*%diag(li)%*%t(ee$vectors)*3*q
-  
-  nu=2*q-1
-  
-  d2222<-make_pseudo_data_rand_eigen_general_psi_v3_glmm(psi=psi,nu=nu,const=1e8,param="variance",link_fun = function(x) x )
-  
-  
-  
-  Ya<-c(xdf$Y,d2222$data$Y)
-  Xa<-rbind(xdf$X,matrix(0,ncol=ncol(xdf$X),nrow=nrow(d2222$data$Z)))
-  Za<-rbind(xdf$Z,d2222$data$Z)
-  groupa<-c(xdf$grouping,max(xdf$grouping)+d2222$data$grouping)
-   weights<-c(rep(1,length(xdf$Y)),d2222$data$nn)
-  
-  xdfa<-list(Y=Ya,X=Xa,Z=Za,grouping=groupa,weights=weights)
-  
-  tmp2 <- glmmTMB(Y~-1+X+(-1+Z|grouping), family = gaussian(link = "identity"),
-                  dispformula = ~offset(-log(weights)),
-                  data=xdfa)
-  tmp2
-}
-
-get_marLik_lmm<-function(fited_model,xdf){
-  
-  tmp2<-fited_model
-  
-  tmp3<-glmmTMB(Y~-1+X+(-1+Z|grouping),data=xdf,family=gaussian(link = "identity"),
-                
-                start=list(beta=tmp2$sdr$par.fixed[which(names(tmp2$sdr$par.fixed)=="beta")],
-                           betad=tmp2$sdr$par.fixed[which(names(tmp2$sdr$par.fixed)=="betad")],
-                           theta=tmp2$sdr$par.fixed[which(names(tmp2$sdr$par.fixed)=="theta")]),
-                control = glmmTMBControl(optCtrl = list(iter.max=0, eval.max=0),rank_check ="skip",conv_check="skip")) #point estimates seem ok, but logLik is NA! They have a trick where they dont want to report loogLik if the model does not converge (which in our case defacto holds), but we can still accesss it via object$fit$objective which seems to give -loglik so it should be minimized
-  
-  
-  -tmp3$fit$objective
-  
-}
-
-tau_finder<-function(tau,xdf,D_est,fit_ml,alpha=0.05){
-  fit_tau<-fiter_lin_tau(tau,D_est,xdf)
-  abs(get_marLik_lmm(fit_tau,xdf)-get_marLik_lmm(fit_ml,xdf))-qchisq(1-alpha,1)/2
-}
- 
-#ML
-D<-VarCorr(fit_glmer)$cond$group[1:2,1:2]
- 
-sek<-seq(from=0,to=0.5,by=0.05)
-y<-rep(NA,length(sek))
-zz=0
-for (i in sek){
-  zz=zz+1
-  y[zz]<-tau_finder(i,xdf,VarCorr(fit_glmer)$cond$group[1:2,1:2],fit_glmer)
-}
-plot(sek,y,type="l")
-abline(h=0)
-
-opt_tau_ml<-uniroot(tau_finder,c(0,1),xdf=xdf,D_est=VarCorr(fit_glmer)$cond$group[1:2,1:2],
-                 fit_ml=fit_glmer,alpha=0.05)
-
-fit_tau_ml<-fiter_lin_tau(opt_tau_ml$root,D_est=VarCorr(fit_glmer)$cond$group[1:2,1:2],xdf=xdf)
-
-
-##ml
-
-mod<-fit_glmer
-
-#for  RE
-#diags
-vr<-mod$sdr$cov.fixed[9:10,9:10]
-est<-mod$sdr$par.fixed[9:10]
-names(est)<-colnames(vr)<-rownames(vr)<-paste0("theta",1:2)
-
-s3.1<-deltaMethod(est,"exp(theta1)",vr)
-s3.2<-deltaMethod(est,"exp(theta2)",vr)
-
-#off diags
-
-vr<-mod$sdr$cov.fixed[11,11]
-est<-mod$sdr$par.fixed[11]
-names(est)<-names(vr)<-paste0("theta",0)
-
-s3.12<-deltaMethod(est,"theta0/sqrt(1+theta0^2)",vr)
-
-#for sd: we need sqrt(exp(betad))#in the new release we need exp(betad)!
-
-vr<-mod$sdr$cov.fixed[8,8]
-est<-mod$sdr$par.fixed[8]
-names(est)<-names(vr)<-"theta"
-
-s.r<-deltaMethod(est,"sqrt(exp(theta))",vr)
-
-#fixef
-vr<-mod$sdr$cov.fixed[1:7,1:7]
-est<-mod$sdr$par.fixed[1:7]
-
-fxf<-paste0(round(est,3)," (",round(sqrt(diag(vr)),3),")")
-
-resi<-c(fxf,
-        paste0(round(s3.1$Estimate,3)," (",round(s3.1$SE,3),")"),
-        paste0(round(s3.2$Estimate,3)," (",round(s3.2$SE,3),")"),
-        
-        paste0(round(s3.12$Estimate,3)," (",round(s3.12$SE,3),")"),
-        paste0(round(s.r$Estimate,3)," (",round(s.r$SE,3),")")
-)
-
-resm<-resi
-
-
-##REML
-
-mod<-fit_glmer_r
-
-#for  RE
-#diags
-vr<-mod$sdr$cov.fixed[(9:10)-7,(9:10)-7]
-est<-mod$sdr$par.fixed[(9:10)-7]
-names(est)<-colnames(vr)<-rownames(vr)<-paste0("theta",1:2)
-
-s3.1<-deltaMethod(est,"exp(theta1)",vr)
-s3.2<-deltaMethod(est,"exp(theta2)",vr)
-
-#off diags
-
-vr<-mod$sdr$cov.fixed[11-7,11-7]
-est<-mod$sdr$par.fixed[11-7]
-names(est)<-names(vr)<-paste0("theta",0)
-
-s3.12<-deltaMethod(est,"theta0/sqrt(1+theta0^2)",vr)
-
-#for sd: we need sqrt(exp(betad))#in the new release we need exp(betad)!
-
-vr<-mod$sdr$cov.fixed[8-7,8-7]
-est<-mod$sdr$par.fixed[8-7]
-names(est)<-names(vr)<-"theta"
-
-s.r<-deltaMethod(est,"sqrt(exp(theta))",vr)
-
-#fixef
-vr<-vcov(mod)$cond
-est<-fixef(mod)$cond
-
-fxf<-paste0(round(est,3)," (",round(sqrt(diag(vr)),3),")")
-
-resi<-c(fxf,
-        paste0(round(s3.1$Estimate,3)," (",round(s3.1$SE,3),")"),
-        paste0(round(s3.2$Estimate,3)," (",round(s3.2$SE,3),")"),
-        
-        paste0(round(s3.12$Estimate,3)," (",round(s3.12$SE,3),")"),
-        paste0(round(s.r$Estimate,3)," (",round(s.r$SE,3),")")
-)
-
-resm_reml<-resi
-
-
-
-##pml
-
-mod<-fit_tau_ml 
-
-#for  RE
-#diags
-vr<-mod$sdr$cov.fixed[9:10,9:10]
-est<-mod$sdr$par.fixed[9:10]
-names(est)<-colnames(vr)<-rownames(vr)<-paste0("theta",1:2)
-
-s3.1<-deltaMethod(est,"exp(theta1)",vr)
-s3.2<-deltaMethod(est,"exp(theta2)",vr)
-
-#off diags
-
-vr<-mod$sdr$cov.fixed[11,11]
-est<-mod$sdr$par.fixed[11]
-names(est)<-names(vr)<-paste0("theta",0)
-
-s3.12<-deltaMethod(est,"theta0/sqrt(1+theta0^2)",vr)
-
-#for sd: we need sqrt(exp(betad))#in the new release we need exp(betad)
-
-vr<-mod$sdr$cov.fixed[8,8]
-est<-mod$sdr$par.fixed[8]
-names(est)<-names(vr)<-"theta"
-
-s.r<-deltaMethod(est,"sqrt(exp(theta))",vr)
-
-#fixef
-vr<-mod$sdr$cov.fixed[1:7,1:7]
-est<-mod$sdr$par.fixed[1:7]
-
-fxf<-paste0(round(est,3)," (",round(sqrt(diag(vr)),3),")")
-
-resi<-c(fxf,
-        paste0(round(s3.1$Estimate,3)," (",round(s3.1$SE,3),")"),
-        paste0(round(s3.2$Estimate,3)," (",round(s3.2$SE,3),")"),
-        
-        paste0(round(s3.12$Estimate,3)," (",round(s3.12$SE,3),")"),
-        paste0(round(s.r$Estimate,3)," (",round(s.r$SE,3),")")
-)
-
-resp2_ml<-resi  
-
-#bml
-
-#bglmer
-mod<-fit_bglmer
-vv <- vcov(mod, full = TRUE)
-
-#fixef
-
-fixf<-paste(round(fixef(mod),3)," (", round(sqrt(diag(vv))[1:7],3),")",sep="")
-
-#ranef
-
-vr<-c(VarCorr(mod)$grouping)[-2]
-
-
-vrv<-vv[8:10,8:10]
-
-names(vr)<-colnames(vrv)<-rownames(vrv)<-c("sigma11","sigma12","sigma22")
-
-s11<-deltaMethod(vr,"sqrt(sigma11)",vrv)
-s22<-deltaMethod(vr,"sqrt(sigma22)",vrv)
-r1<-deltaMethod(vr,"sigma12/sqrt(sigma11*sigma22)",vrv)
-
-rnf<-c(paste0(round(s11$Estimate,3)," (",round(s11$SE,3),")"),
-       paste0(round(s22$Estimate,3)," (",round(s22$SE,3),")"),
-       paste0(round(r1$Estimate,3)," (",round(r1$SE,3),")")
-)
-
-
-#residual
-
-st<-summary(mod)$sigma**2
-vst<-vv[11,11]
-names(st)<-names(vst)<-"sigma1"
-
-s11<-deltaMethod(st,"sqrt(sigma1)",vst)
-
-rs<-paste0(round(s11$Estimate,3)," (",round(s11$SE,3),")")
-
-resi<-c(fixf,rnf,rs)
-
-res_bglmer<-resi
-
-
-res<-cbind(resm,resm_reml,res_bglmer, resp2_ml )
-colnames(res)<-c("ML","REML","BM", paste0("PML(",round(opt_tau_ml$root,2),")") )
-
-vrnm<-c("Intercept","Gender$[$male$]$","prevOI$[$AID$]$","AZT$[$failure$]$","Obstime","Drug$[$ddI$]$","Obstime$\\times$ Drug$[$ddI$]$",
-        "Patient",rep("",3))
-
-res<-cbind(vrnm,res)
-
-
-rownm<-c("$\\beta_0$","$\\beta_1$","$\\beta_2$","$\\beta_3$","$\\beta_4$","$\\beta_5$","$\\beta_6$",
-         "$\\sigma_1$","$\\sigma_2$",
-         "$\\rho$","$\\sigma_\\epsilon$")
-
-rownames(res)<-rownm
-res_lin<-res
-
-print(xtable(res),sanitize.text.function=function(x){x})
 
 
 
@@ -1151,7 +1236,7 @@ resb<-c(fxf,res.s3.bml1,res.s3.bml2)
 
 res<-cbind(resm,resm_reml,resb,resp_ml )
 
-colnames(res)<-c("ML","REML", "BM","PML(1)" )
+colnames(res)<-c("ML","REML", "BM","PML" )
 
  
 vrnm<-c("Intercept","Question$[$basic$]$","Topic$[$complex no.$]$","$[$diff. eq.$]$","$[$differentiation$]$",
