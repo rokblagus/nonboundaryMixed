@@ -366,7 +366,7 @@ grid.arrange(p1b,p2b,p3b,nrow=3)
 dev.off()
 
 
-#main document, boundary
+#supp, boundary
 
 p0<-ggplot(df)+
   geom_point(aes(x=Nn2,y=bound_t*100,colour =  method),size=2)+
@@ -385,8 +385,19 @@ p0
 dev.off()
 
 
-#main document, prial
+#supp document, prial
  
 pdf("bin/figs/main_bin_prial.pdf",height=6,width=12)
 pp
 dev.off()
+
+
+#
+df_bin<-df
+df_bin$model<-"BMM"
+
+df_bin2<-df2
+df_bin2$model<-"BMM"
+
+ 
+save(df_bin,df_bin2,file="res_bin.Rdata")

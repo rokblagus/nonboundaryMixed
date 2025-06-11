@@ -412,7 +412,7 @@ grid.arrange(p1b,p2b,p3b,nrow=3)
 dev.off()
 
 
-#main document, boundary
+#supp document, boundary
 
 p0<-ggplot(df)+
   geom_point(aes(x=Nn2,y=bound_t*100,colour =  method),size=2)+
@@ -431,7 +431,7 @@ p0
 dev.off()
 
 
-#main document, prial
+#supp document, prial
 
 pdf("lmm/figs/supp_lmm_prial.pdf",height=10,width=12)
 fig2
@@ -440,3 +440,14 @@ dev.off()
 pdf("lmm/figs/main_lmm_prial.pdf",height=6,width=12)
 pp
 dev.off()
+
+df_lin<-df
+df_lin$model<-"LMM"
+
+df_lin2<-df2
+df_lin2$model<-"LMM"
+
+
+save(df_lin,df_lin2,file="res_lin.Rdata")
+
+

@@ -357,7 +357,7 @@ pdf("pois/figs/supp_pois_beta5.pdf",height=10,width=10)
 grid.arrange(p1b,p2b,p3b,nrow=3)
 dev.off()
 
-#main document, boundary
+#supp document, boundary
 
 p0<-ggplot(df)+
   geom_point(aes(x=Nn2,y=bound_t*100,colour =  method),size=2)+
@@ -376,8 +376,18 @@ p0
 dev.off()
 
 
-#main document, prial
+#supp document, prial
 
 pdf("pois/figs/main_pois_prial.pdf",height=6,width=12)
 pp
 dev.off()
+
+
+df_pois<-df
+df_pois$model<-"PMM"
+
+df_pois2<-df2
+df_pois2$model<-"PMM"
+
+save(df_pois,df_pois2,file="res_pois.Rdata")
+
