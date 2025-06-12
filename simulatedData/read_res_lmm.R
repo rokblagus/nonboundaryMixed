@@ -236,16 +236,24 @@ dfpallete<-c("black","red","cadetblue","blue","blueviolet","deeppink")
 dfpallete2<-c("red","cadetblue","blue","blueviolet","deeppink")
 dfpallete3<-c("red","blue","blueviolet","deeppink")
 
+
+df$group<-ifelse(df$N==25,"1","2")
+df2$group<-ifelse(df2$N==25,"1","2")
+
+nms<-c("N=25\n n=moderate","N=25\n n=large","N=50\n n=moderate","N=50\n n=large")
+
+
+
 #supplement: boundary est all criteria, b5, loss(?)
 
-ploss<-ggplot(df)+
+ploss<-ggplot(df,aes(group=interaction(method, group)))+
   geom_point(aes(x=Nn2,y=log(mloss,base=10),colour =  method),size=2)+
   geom_line(aes(x=Nn2,y=log(mloss,base=10),colour =  method),size=.7)+
   facet_grid(r2~vars,labeller = label_parsed)+
   theme_light()+
-  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=levels(factor(df$Nn)))+
+  scale_x_continuous(name="", breaks=c(1,2,3,4),labels=nms,limits = c(0.75,4.25) )+
   ylab(expression(log[10](loss)))+
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))+
+  theme(axis.text.x = element_text( vjust = 0.5, hjust=0.5))+
   
   scale_colour_manual(values=dfpallete)+
   theme(legend.title=element_blank())
@@ -255,55 +263,57 @@ ploss
 dev.off()
 
 
-p1<-ggplot(df)+
+
+
+p1<-ggplot(df,aes(group=interaction(method, group)))+
   geom_point(aes(x=Nn2,y=bound_rho*100,colour =  method),size=2)+
   geom_line(aes(x=Nn2,y=bound_rho*100,colour =  method),size=.7)+
   facet_grid(r2~vars,labeller = label_parsed)+
   theme_light()+
-  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=levels(factor(df$Nn)))+
+  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=nms,limits = c(0.75,4.25))+
   ylab("boundary correlation (%)")+
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))+
+  theme(axis.text.x = element_text( vjust = 0.5, hjust=0.5))+
   geom_hline(yintercept=0)+
   scale_colour_manual(values=dfpallete)+
   theme(legend.title=element_blank())
 
-p2<-ggplot(df)+
+p2<-ggplot(df,aes(group=interaction(method, group)))+
   geom_point(aes(x=Nn2,y=bound_s*100,colour =  method),size=2)+
   geom_line(aes(x=Nn2,y=bound_s*100,colour =  method),size=.7)+
   facet_grid(r2~vars,labeller = label_parsed)+
   theme_light()+
-  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=levels(factor(df$Nn)))+
+  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=nms,limits = c(0.75,4.25))+
   ylab("boundary standard deviations (%)")+
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))+
+  theme(axis.text.x = element_text( vjust = 0.5, hjust=0.5))+
   geom_hline(yintercept=0) +
   scale_colour_manual(values=dfpallete)+
   theme(legend.title=element_blank())
 
-p0<-ggplot(df)+
+p0<-ggplot(df,aes(group=interaction(method, group)))+
   geom_point(aes(x=Nn2,y=bound_t*100,colour =  method),size=2)+
   geom_line(aes(x=Nn2,y=bound_t*100,colour =  method),size=.7)+
   facet_grid(r2~vars,labeller = label_parsed)+
   theme_light()+
-  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=levels(factor(df$Nn)))+
+  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=nms,limits = c(0.75,4.25))+
   ylab("boundary estimate (%)")+
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))+
+  theme(axis.text.x = element_text( vjust = 0.5, hjust=0.5))+
   geom_hline(yintercept=0) +
   scale_colour_manual(values=dfpallete)+
   theme(legend.title=element_blank())
 
 
 
-pp<-ggplot(df2[df2$method!="BM",])+
+pp<-ggplot(df2[df2$method!="BM",],aes(group=interaction(method, group)))+
   geom_point(aes(x=Nn2,y=prial,colour =  method),size=2)+
   geom_line(aes(x=Nn2,y=prial,colour =  method),size=0.7)+
   facet_grid(r2~vars,scales="free_y",labeller = label_parsed)+
   theme_light()+
-  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=levels(factor(df2$Nn)))+
+  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=nms,limits = c(0.75,4.25))+
   ylab("PRIAL (%)")+
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))+
+  theme(axis.text.x = element_text( vjust = 0.5, hjust=0.5))+
   geom_hline(yintercept=0)+
   scale_colour_manual(values=dfpallete3)+
-  theme(legend.title=element_blank()) 
+  theme(legend.title=element_blank())
 
 #need to break the axis!
 df2$breaks<-rep(NA,nrow(df2))
@@ -315,7 +325,7 @@ library(tidyverse)
 df21<-df2[df2$rho==0.5,]
 
 df21$r2<-factor(df21$r2)
-pps1<-ggplot(df21 )+
+pps1<-ggplot(df21,aes(group=interaction(method, group)) )+
   geom_hline(data = df21 %>% filter(breaks == "(-100*','*100)"),
              aes(yintercept = 0))+
   geom_point(aes(x=Nn2,y=prial,colour =  method),size=2)+
@@ -323,13 +333,13 @@ pps1<-ggplot(df21 )+
   facet_grid(r2+breaks~vars,scales="free_y", labeller = label_parsed,drop=TRUE )+
   theme_light()+
   theme(panel.spacing.y=unit(0, "lines"),axis.text.x=element_blank(),axis.ticks.x=element_blank())+
-    #guides(colour = guide_legend(override.aes = list(size=5)))+
-  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=levels(factor(df21$Nn)))+
+  #guides(colour = guide_legend(override.aes = list(size=5)))+
+  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=nms,limits = c(0.75,4.25))+
   ylab("PRIAL (%)")+
-   
+  
   #geom_hline(yintercept=0)+
   scale_colour_manual(values=dfpallete2)+
-  theme(legend.title=element_blank())  
+  theme(legend.title=element_blank())
 
 
 df2$breaks<-rep(NA,nrow(df2))
@@ -340,7 +350,7 @@ df2$breaks<-factor(df2$breaks,levels=c("(-100*','*100)","(-2000*','*-100)","(-in
 
 df22<-df2[df2$rho==0.8,]
 df22$r2<-factor(df22$r2)
-pps2<-ggplot(df22 )+
+pps2<-ggplot(df22 ,aes(group=interaction(method, group)))+
   geom_hline(data = df22 %>% filter(breaks == "(-100*','*100)"),
              aes(yintercept = 0))+
   geom_point(aes(x=Nn2,y=prial,colour =  method),size=2)+
@@ -349,12 +359,12 @@ pps2<-ggplot(df22 )+
   theme_light()+
   theme(panel.spacing.y=unit(0, "lines"))+
   #guides(colour = guide_legend(override.aes = list(size=5)))+
-  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=levels(factor(df22$Nn)))+
+  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=nms,limits = c(0.75,4.25))+
   ylab("PRIAL (%)")+
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))+
+  theme(axis.text.x = element_text( vjust = 0.5, hjust=0.5))+
   #geom_hline(yintercept=0)+
   scale_colour_manual(values=dfpallete2)+
-  theme(legend.title=element_blank()) 
+  theme(legend.title=element_blank())
 
 library(grid)
 library(ggpubr)
@@ -362,44 +372,44 @@ fig<-ggarrange(pps1+ rremove("ylab"),pps2+ rremove("ylab"),ncol=1,nrow=2,common.
 fig2<-annotate_figure(fig, left = textGrob("PRIAL (%)", rot = 90, vjust = 1, gp = gpar(cex = 1)) )
 
 
-pdf("lmm/figs/supp_lmm_boundary.pdf",height=10,width=10)
+pdf("lmm/figs/supp_lmm_boundary.pdf",height=10,width=12)
 grid.arrange(p0,p1,p2,nrow=3)
 dev.off()
 
 ##bias,rmse, cover for beta5
 
-p1b<-ggplot(df)+
+p1b<-ggplot(df,aes(group=interaction(method, group)))+
   geom_point(aes(x=Nn2,y=bias_b5,colour =  method),size=2)+
   geom_line(aes(x=Nn2,y=bias_b5,colour =  method),size=.7)+
   facet_grid(r2~vars,labeller = label_parsed)+
   theme_light()+
-  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=levels(factor(df$Nn)))+
+  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=nms,limits = c(0.75,4.25))+
   ylab("bias")+
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))+
+  theme(axis.text.x = element_text( vjust = 0.5, hjust=0.5))+
   geom_hline(yintercept=0)+
   scale_colour_manual(values=dfpallete)+
   theme(legend.title=element_blank())
 
-p2b<-ggplot(df)+
+p2b<-ggplot(df,aes(group=interaction(method, group)))+
   geom_point(aes(x=Nn2,y=rmse_b5,colour =  method),size=2)+
   geom_line(aes(x=Nn2,y=rmse_b5,colour =  method),size=.7)+
   facet_grid(r2~vars,labeller = label_parsed)+
   theme_light()+
-  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=levels(factor(df$Nn)))+
+  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=nms,limits = c(0.75,4.25))+
   ylab("RMSE")+
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))+
-   
+  theme(axis.text.x = element_text(  vjust = 0.5, hjust=0.5))+
+  
   scale_colour_manual(values=dfpallete)+
   theme(legend.title=element_blank())
 
-p3b<-ggplot(df)+
+p3b<-ggplot(df,aes(group=interaction(method, group)))+
   geom_point(aes(x=Nn2,y=covr*100,colour =  method),size=2)+
   geom_line(aes(x=Nn2,y=covr*100,colour =  method),size=.7)+
   facet_grid(r2~vars,labeller = label_parsed)+
   theme_light()+
-  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=levels(factor(df$Nn)))+
+  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=nms,limits = c(0.75,4.25))+
   ylab("coverage (%)")+
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))+
+  theme(axis.text.x = element_text( vjust = 0.5, hjust=0.5))+
   geom_hline(yintercept=95)+
   scale_colour_manual(values=dfpallete)+
   theme(legend.title=element_blank())+
@@ -407,28 +417,13 @@ p3b<-ggplot(df)+
            alpha = .2)
 
 
-pdf("lmm/figs/supp_lmm_beta5.pdf",height=10,width=10)
+pdf("lmm/figs/supp_lmm_beta5.pdf",height=10,width=12)
 grid.arrange(p1b,p2b,p3b,nrow=3)
 dev.off()
 
 
-#supp document, boundary
-
-p0<-ggplot(df)+
-  geom_point(aes(x=Nn2,y=bound_t*100,colour =  method),size=2)+
-  geom_line(aes(x=Nn2,y=bound_t*100,colour =  method),size=.7)+
-  facet_grid(r2~vars,labeller = label_parsed)+
-  theme_light()+
-  scale_x_continuous(name="", breaks=c(1,2,3,4), labels=levels(factor(df$Nn)))+
-  ylab("boundary estimate (%)")+
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))+
-  geom_hline(yintercept=0) +
-  scale_colour_manual(values=dfpallete)+
-  theme(legend.title=element_blank())
-
-pdf("lmm/figs/main_lmm_boundary.pdf",height=6,width=12)
-p0
-dev.off()
+ 
+ 
 
 
 #supp document, prial
@@ -440,6 +435,8 @@ dev.off()
 pdf("lmm/figs/main_lmm_prial.pdf",height=6,width=12)
 pp
 dev.off()
+
+ 
 
 df_lin<-df
 df_lin$model<-"LMM"

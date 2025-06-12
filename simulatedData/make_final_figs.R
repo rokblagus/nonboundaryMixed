@@ -25,10 +25,10 @@ df$group<-ifelse(df$N==25,"1","2")
 df2$group<-ifelse(df2$N==25,"1","2")
 
  
-nms<-c("N=25\n n=\"moderate\"","N=25\n n=\"large\"","N=50\n n=\"moderate\"","N=50\n n=\"large\"")
+#nms<-c("N=25\n n=\"moderate\"","N=25\n n=\"large\"","N=50\n n=\"moderate\"","N=50\n n=\"large\"")
 nms<-c("N=25\n n=moderate","N=25\n n=large","N=50\n n=moderate","N=50\n n=large")
 
-p0<-ggplot(df[df$rho==0.5 ,],aes(color=method,group=interaction(method, group)) )+
+p0<-ggplot(df[df$rho==0.5 ,],aes(group=interaction(method, group)) )+
   geom_point(aes(x=Nn2,y=bound_t*100,color=method  ),size=2)+
   geom_line(aes(x=Nn2,y=bound_t*100,color=method  ),size=.7)+
   facet_grid(model2~vars,labeller = label_parsed)+
@@ -44,7 +44,7 @@ p0<-ggplot(df[df$rho==0.5 ,],aes(color=method,group=interaction(method, group)) 
  
 
 
-pp<-ggplot(df2[df2$rho==0.5&!(df2$method=="BM"&df2$model=="LMM"),],aes(color=method,group=interaction(method, group)))+
+pp<-ggplot(df2[df2$rho==0.5&!(df2$method=="BM"&df2$model=="LMM"),],aes(group=interaction(method, group)))+
   geom_point(aes(x=Nn2,y=prial,colour =  method),size=2)+
   geom_line(aes(x=Nn2,y=prial,colour =  method),size=0.7)+
   facet_grid(model2~vars,scales="free_y",labeller = label_parsed)+
