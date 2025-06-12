@@ -907,7 +907,7 @@ print(xtable(res),sanitize.text.function=function(x){x})
 
 dd<-read.csv2("MathEdataset.csv")
 
-dd$Student.ID2<-paste0(dd$Student.ID,dd$Student.Country)
+#dd$Student.ID2<-paste0(dd$Student.ID,dd$Student.Country)
 
  
 Y<-dd$Type.of.Answer
@@ -915,7 +915,10 @@ X<-model.matrix(Type.of.Answer~Question.Level+Topic,data=dd)
 Z1<-model.matrix(~Question.Level,data=dd)
 Z2<-model.matrix(~Question.Level,data=dd)
 grouping1<-as.numeric(as.factor(dd$Student.Country))
-grouping2<-as.numeric(as.factor(dd$Student.ID2))
+#grouping2<-as.numeric(as.factor(dd$Student.ID2))
+grouping2<-as.numeric(as.factor(dd$Student.ID))
+
+
 
 xdf<-list(Y=Y,X=X,Z1=Z1,Z2=Z2,grouping1=grouping1,grouping2=grouping2)
 
