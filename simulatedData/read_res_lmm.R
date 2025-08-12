@@ -155,13 +155,6 @@ txt2<-"sigma[1]^2"
 df$Nn<-paste0("N=",df$N,",n=",df$n)
 df$vars<-paste0(txt1,"==",df$vr_int,"*','*~",txt2,"==",df$vr_int*df$mult)
 
-dft$Nn<-paste0("N=",dft$N,",n=",dft$n)
-dft$vars<-paste0(txt1,"==",dft$vr_int,"*','*~",txt2,"==",dft$vr_int*dft$mult)
-
-dft$Nn2<-as.numeric(as.factor(dft$Nn))
-
-
-dft$r2<-paste0("rho==",dft$rho)
 
  
 df$Nn2<-as.numeric(as.factor(df$Nn))
