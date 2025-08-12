@@ -55,8 +55,9 @@ dfmsi<-NULL
 zz=0
 for (N in c(25,50)){
   for (n in c(10,20)){
-    for (vr_int in c(0.01,0.1)){
-      for (mult in c(0.5,1.5)){
+    for (vr_int in c(0.001,0.01,0.1)){ #changed to include added results after rev avg 25
+if (vr_int==0.001) multi=0.1 else multi=c(0.5,1.5)     
+ for (mult in multi){
         for (rh in c(0.5,0.8)){
           mod="lmm"
           
@@ -177,8 +178,9 @@ df$r2<-paste0("rho==",df$rho)
 zz=0
 for (N in c(25,50)){
   for (n in c(10,20)){
-    for (vr_int in c(0.01,0.1)){
-      for (mult in c(0.5,1.5)){
+    for (vr_int in c(0.001,0.01,0.1)){ #changed to include added results after rev avg 25
+if (vr_int==0.001) multi=0.1 else multi=c(0.5,1.5)     
+ for (mult in multi){
         for (rh in c(0.5,0.8)){
           mod="bin"
           
