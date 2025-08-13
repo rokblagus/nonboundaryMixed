@@ -253,7 +253,7 @@ ploss<-ggplot(df,aes(group=interaction(method, group)))+
   scale_colour_manual(values=dfpallete)+
   theme(legend.title=element_blank())
 
-pdf("lmm/figs/supp_lmm_loss.pdf",height=6,width=12)
+pdf("lmm/figs/supp_lmm_loss.pdf",height=6,width=15)
 ploss
 dev.off()
 
@@ -367,7 +367,7 @@ fig<-ggarrange(pps1+ rremove("ylab"),pps2+ rremove("ylab"),ncol=1,nrow=2,common.
 fig2<-annotate_figure(fig, left = textGrob("PRIAL (%)", rot = 90, vjust = 1, gp = gpar(cex = 1)) )
 
 
-pdf("lmm/figs/supp_lmm_boundary.pdf",height=10,width=12)
+pdf("lmm/figs/supp_lmm_boundary.pdf",height=10,width=15)
 grid.arrange(p0,p1,p2,nrow=3)
 dev.off()
 
@@ -412,7 +412,7 @@ p3b<-ggplot(df,aes(group=interaction(method, group)))+
            alpha = .2)
 
 
-pdf("lmm/figs/supp_lmm_beta5.pdf",height=10,width=12)
+pdf("lmm/figs/supp_lmm_beta5.pdf",height=10,width=15)
 grid.arrange(p1b,p2b,p3b,nrow=3)
 dev.off()
 
@@ -423,11 +423,11 @@ dev.off()
 
 #supp document, prial
 
-pdf("lmm/figs/supp_lmm_prial.pdf",height=10,width=12)
+pdf("lmm/figs/supp_lmm_prial.pdf",height=11,width=15)
 fig2
 dev.off()
 
-pdf("lmm/figs/main_lmm_prial.pdf",height=6,width=12)
+pdf("lmm/figs/main_lmm_prial.pdf",height=6,width=15)
 pp
 dev.off()
 

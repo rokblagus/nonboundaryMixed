@@ -7,6 +7,7 @@ dfpallete<-c("black","red","cadetblue","blue","blueviolet","deeppink")
 dfpallete2<-c("red","cadetblue","blue","blueviolet","deeppink")
 
 
+df_lin2<-df_lin2[,-which(names(df_lin2)=="breaks")]
 
 df<-rbind(df_bin,df_lin,df_pois)
 

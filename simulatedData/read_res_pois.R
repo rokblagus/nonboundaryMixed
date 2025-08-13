@@ -295,7 +295,7 @@ pp<-ggplot(df2,aes(group=interaction(method, group)))+
   scale_colour_manual(values=dfpallete2)+
   theme(legend.title=element_blank())
 
-pdf("pois/figs/supp_pois_boundary.pdf",height=10,width=12)
+pdf("pois/figs/supp_pois_boundary.pdf",height=10,width=15)
 grid.arrange(p0,p1,p2,nrow=3)
 dev.off()
 
@@ -312,7 +312,7 @@ ploss<-ggplot(df,aes(group=interaction(method, group)))+
   scale_colour_manual(values=dfpallete)+
   theme(legend.title=element_blank())
 
-pdf("pois/figs/supp_pois_loss.pdf",height=6,width=12)
+pdf("pois/figs/supp_pois_loss.pdf",height=6,width=15)
 ploss
 dev.off()
 
@@ -357,14 +357,14 @@ p3b<-ggplot(df,aes(group=interaction(method, group)))+
            alpha = .2)
 
 
-pdf("pois/figs/supp_pois_beta5.pdf",height=10,width=12)
+pdf("pois/figs/supp_pois_beta5.pdf",height=10,width=15)
 grid.arrange(p1b,p2b,p3b,nrow=3)
 dev.off()
 
  
 #supp  document, prial
 
-pdf("pois/figs/main_pois_prial.pdf",height=6,width=12)
+pdf("pois/figs/main_pois_prial.pdf",height=6,width=15)
 pp
 dev.off()
 
