@@ -1,1 +1,1 @@
-Folder "simulatedData" contains all code required to reproduce the results for the simulated data. Folder "realData" contains the code and datasets to reproduce the results for the real data illustration.
+Folder "simulatedData" contains all code required to reproduce the results for the simulated data. Folder "realData" contains the code and datasets to reproduce the results for the real data illustration. Folder "extensions" contains the code required to reproduce the results reported in Web Appendix I.

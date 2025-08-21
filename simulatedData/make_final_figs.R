@@ -57,22 +57,22 @@ pp<-ggplot(df2[df2$rho==0.5&!(df2$method=="BM"&df2$model=="LMM"),],aes(group=int
   scale_colour_manual(values=dfpallete2)+
   theme(legend.title=element_blank())
 
-tiff("Fig_bound_all.tif",height=6*3/2*0.8,width=12,units="in",res=1200,compression = "lzw")
+tiff("Fig_bound_all.tif",height=6*3/2*0.8,width=15,units="in",res=1200,compression = "lzw")
 p0
 dev.off()
 
 
-pdf("Fig_bound_all.pdf",height=6*3/2*0.8,width=12 )
+pdf("Fig_bound_all.pdf",height=6*3/2*0.8,width=15 )
 p0
 dev.off()
 
 
-tiff("Fig_prial_all.tif",height=6*3/2*0.8,width=12,units="in",res=1200,compression = "lzw")
+tiff("Fig_prial_all.tif",height=6*3/2*0.8,width=15,units="in",res=1200,compression = "lzw")
 pp
 dev.off()
 
 
-pdf("Fig_prial_all.pdf",height=6*3/2*0.8,width=12 )
+pdf("Fig_prial_all.pdf",height=6*3/2*0.8,width=15 )
 pp
 dev.off()
 
