@@ -176,7 +176,7 @@ for (N in c(25,50)){
 if (vr_int==0.001) multi=0.1 else multi=c(0.5,1.5)     
  for (mult in multi){
        for (rh in c(0.5,0.8)){
-          mod="bin"
+          mod="pois"
           
           
           for (meth in c("reml","bml", "tml","to", "o")){
