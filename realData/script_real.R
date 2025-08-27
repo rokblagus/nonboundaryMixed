@@ -256,6 +256,952 @@ fit_tau_ml<-fiter_lin_tau(opt_tau_ml$root,D_est=VarCorr(fit_glmer)$cond$grouping
 
 
 
+##plot coefs (at the internal scale!) with their Wald type CIs: you can make an argument that theta56 are unreasonable with ML/REML, further for theta456 you can get CIs; CIs for BM for some theta at this scale are very wide, resulting in very wide CIs 
+
+mod<-fit_glmer
+
+est<-mod$sdr$par.fixed
+ses<-sqrt(diag(mod$sdr$cov.fixed))
+
+res<-cbind(est,ses,est-qnorm(0.975)*ses,est+qnorm(0.975)*ses)
+colnames(res)<-c("Estimate","SE","CI_low","CI_up")
+
+df <- as.data.frame(res)
+df$Coefficient <- rownames(res)  # use row names as labels
+df$Coefficient[df$Coefficient=="beta"]<-paste0(df$Coefficient[df$Coefficient=="beta"],0:2)
+df$Coefficient[df$Coefficient=="theta"]<-paste0(df$Coefficient[df$Coefficient=="theta"],1:7)
+
+
+# Make Coefficient a factor to control order in plot
+df$Coefficient <- factor(df$Coefficient) 
+#df$group<-factor(ifelse(df$Estimate<(-100),1,2))
+
+
+df$Method="ML"
+
+df_ml<-df
+
+##PML
+
+mod<-fit_tau_ml
+
+est<-mod$sdr$par.fixed
+ses<-sqrt(diag(mod$sdr$cov.fixed))
+
+res<-cbind(est,ses,est-qnorm(0.975)*ses,est+qnorm(0.975)*ses)
+colnames(res)<-c("Estimate","SE","CI_low","CI_up")
+
+df <- as.data.frame(res)
+df$Coefficient <- rownames(res)  # use row names as labels
+df$Coefficient[df$Coefficient=="beta"]<-paste0(df$Coefficient[df$Coefficient=="beta"],0:2)
+df$Coefficient[df$Coefficient=="theta"]<-paste0(df$Coefficient[df$Coefficient=="theta"],1:7)
+
+
+# Make Coefficient a factor to control order in plot
+df$Coefficient <- factor(df$Coefficient) 
+#df$group<-factor(ifelse(df$Coefficient%in%c("theta5","theta6"),1,2))
+
+
+
+df$Method="PML"
+df_pml<-df
+
+##REML
+
+mod<-fit_glmer_r
+
+est<-c(fixef(mod)$cond,mod$sdr$par.fixed)
+ses<-c(sqrt(diag(vcov(mod)$cond)),sqrt(diag(mod$sdr$cov.fixed)))
+
+res<-cbind(est,ses,est-qnorm(0.975)*ses,est+qnorm(0.975)*ses)
+colnames(res)<-c("Estimate","SE","CI_low","CI_up")
+
+df <- as.data.frame(res)
+df$Coefficient <- df_ml$Coefficient
+
+# Make Coefficient a factor to control order in plot
+#df$group<-factor(ifelse(df$Coefficient%in%c("theta5","theta6"),1,2))
+
+df$Method="REML"
+
+df_reml<-df
+
+
+##BM
+
+#estr<-getME(fit_bglmer, "theta") 
+
+#hess<-fit_bglmer@optinfo$derivs$Hessian
+
+#we need to put thetas on the same scale as used in TMB! the best way is via D and its SE, as we use in our Tables!
+
+mod<-fit_bglmer
+vv <- vcov(mod, full = TRUE)
+
+
+
+#ranef, first RE
+
+vr<-c(VarCorr(mod)$grouping1)[-c(4,7,8)]
+
+
+vrv<-vv[-c(1:3,10:11),-c(1:3,10:11)]
+
+names(vr)<-colnames(vrv)<-rownames(vrv)<-c("sigma11","sigma12","sigma13","sigma22","sigma23","sigma33")
+
+#s11<-deltaMethod(vr,"log(sqrt(sigma11))",vrv)
+#s22<-deltaMethod(vr,"log(sqrt(sigma22))",vrv)
+#s33<-deltaMethod(vr,"log(sqrt(sigma33))",vrv)
+
+#avoid deltaMethod so that we have the same func for all!
+
+#theta1:
+theta_expr <- function(vr){
+  sigma11 <- vr["sigma11"]
+  sigma12 <- vr["sigma12"]
+  sigma13 <- vr["sigma13"]
+  sigma22 <- vr["sigma22"]
+  sigma23 <- vr["sigma23"]
+  sigma33 <- vr["sigma33"]
+  
+  # Compute standard deviations
+  s1 <- sqrt(sigma11)
+  s2 <- sqrt(sigma22)
+  s3 <- sqrt(sigma33)
+  
+  # Correlations
+  r12 <- sigma12 / (s1 * s2)
+  r13 <- sigma13 / (s1 * s3)
+  r23 <- sigma23 / (s2 * s3)
+  
+  # Correlation matrix
+  R <- matrix(c(1,   r12, r13,
+                r12, 1,   r23,
+                r13, r23, 1), nrow=3, byrow=TRUE)
+  
+  # Cholesky factor (lower triangular)
+  L <- t(chol(R))
+  
+  # Compute the theta parameters
+  theta0 <- L[2,1] / L[2,2]
+  #theta1 <- L[3,1] / L[3,3]
+  #theta2 <- L[3,2] / L[3,3]
+  log(s1)
+}
+grad <- grad(func = theta_expr, x = vr)
+var_theta1 <- t(grad) %*% vrv %*% grad
+se_theta1 <- sqrt(var_theta1)
+
+theta1<-c(theta_expr(vr),as.numeric(se_theta1))
+
+#theta2:
+theta_expr <- function(vr){
+  sigma11 <- vr["sigma11"]
+  sigma12 <- vr["sigma12"]
+  sigma13 <- vr["sigma13"]
+  sigma22 <- vr["sigma22"]
+  sigma23 <- vr["sigma23"]
+  sigma33 <- vr["sigma33"]
+  
+  # Compute standard deviations
+  s1 <- sqrt(sigma11)
+  s2 <- sqrt(sigma22)
+  s3 <- sqrt(sigma33)
+  
+  # Correlations
+  r12 <- sigma12 / (s1 * s2)
+  r13 <- sigma13 / (s1 * s3)
+  r23 <- sigma23 / (s2 * s3)
+  
+  # Correlation matrix
+  R <- matrix(c(1,   r12, r13,
+                r12, 1,   r23,
+                r13, r23, 1), nrow=3, byrow=TRUE)
+  
+  # Cholesky factor (lower triangular)
+  L <- t(chol(R))
+  
+  # Compute the theta parameters
+  theta0 <- L[2,1] / L[2,2]
+  #theta1 <- L[3,1] / L[3,3]
+  #theta2 <- L[3,2] / L[3,3]
+  log(s2)
+}
+grad <- grad(func = theta_expr, x = vr)
+var_theta2 <- t(grad) %*% vrv %*% grad
+se_theta2 <- sqrt(var_theta2)
+
+theta2<-c(theta_expr(vr),as.numeric(se_theta2))
+
+#theta3:
+theta_expr <- function(vr){
+  sigma11 <- vr["sigma11"]
+  sigma12 <- vr["sigma12"]
+  sigma13 <- vr["sigma13"]
+  sigma22 <- vr["sigma22"]
+  sigma23 <- vr["sigma23"]
+  sigma33 <- vr["sigma33"]
+  
+  # Compute standard deviations
+  s1 <- sqrt(sigma11)
+  s2 <- sqrt(sigma22)
+  s3 <- sqrt(sigma33)
+  
+  # Correlations
+  r12 <- sigma12 / (s1 * s2)
+  r13 <- sigma13 / (s1 * s3)
+  r23 <- sigma23 / (s2 * s3)
+  
+  # Correlation matrix
+  R <- matrix(c(1,   r12, r13,
+                r12, 1,   r23,
+                r13, r23, 1), nrow=3, byrow=TRUE)
+  
+  # Cholesky factor (lower triangular)
+  L <- t(chol(R))
+  
+  # Compute the theta parameters
+  theta0 <- L[2,1] / L[2,2]
+  #theta1 <- L[3,1] / L[3,3]
+  #theta2 <- L[3,2] / L[3,3]
+  log(s3)
+}
+grad <- grad(func = theta_expr, x = vr)
+var_theta3 <- t(grad) %*% vrv %*% grad
+se_theta3 <- sqrt(var_theta3)
+
+theta3<-c(theta_expr(vr),as.numeric(se_theta3))
+
+
+#theta4:
+theta_expr <- function(vr){
+  sigma11 <- vr["sigma11"]
+  sigma12 <- vr["sigma12"]
+  sigma13 <- vr["sigma13"]
+  sigma22 <- vr["sigma22"]
+  sigma23 <- vr["sigma23"]
+  sigma33 <- vr["sigma33"]
+  
+  # Compute standard deviations
+  s1 <- sqrt(sigma11)
+  s2 <- sqrt(sigma22)
+  s3 <- sqrt(sigma33)
+  
+  # Correlations
+  r12 <- sigma12 / (s1 * s2)
+  r13 <- sigma13 / (s1 * s3)
+  r23 <- sigma23 / (s2 * s3)
+  
+  # Correlation matrix
+  R <- matrix(c(1,   r12, r13,
+                r12, 1,   r23,
+                r13, r23, 1), nrow=3, byrow=TRUE)
+  
+  # Cholesky factor (lower triangular)
+  L <- t(chol(R))
+  
+  # Compute the theta parameters
+  theta0 <- L[2,1] / L[2,2]
+  theta1 <- L[3,1] / L[3,3]
+  theta2 <- L[3,2] / L[3,3]
+  theta0
+}
+grad <- grad(func = theta_expr, x = vr)
+var_theta4 <- t(grad) %*% vrv %*% grad
+se_theta4 <- sqrt(var_theta4)
+
+theta4<-c(theta_expr(vr),as.numeric(se_theta4))
+
+#theta5
+theta_expr <- function(vr){
+  sigma11 <- vr["sigma11"]
+  sigma12 <- vr["sigma12"]
+  sigma13 <- vr["sigma13"]
+  sigma22 <- vr["sigma22"]
+  sigma23 <- vr["sigma23"]
+  sigma33 <- vr["sigma33"]
+  
+  # Compute standard deviations
+  s1 <- sqrt(sigma11)
+  s2 <- sqrt(sigma22)
+  s3 <- sqrt(sigma33)
+  
+  # Correlations
+  r12 <- sigma12 / (s1 * s2)
+  r13 <- sigma13 / (s1 * s3)
+  r23 <- sigma23 / (s2 * s3)
+  
+  # Correlation matrix
+  R <- matrix(c(1,   r12, r13,
+                r12, 1,   r23,
+                r13, r23, 1), nrow=3, byrow=TRUE)
+  
+  # Cholesky factor (lower triangular)
+  L <- t(chol(R))
+  
+  # Compute the theta parameters
+  theta0 <- L[2,1] / L[2,2]
+  theta1 <- L[3,1] / L[3,3]
+  theta2 <- L[3,2] / L[3,3]
+  theta1
+}
+grad <- grad(func = theta_expr, x = vr)
+var_theta5 <- t(grad) %*% vrv %*% grad
+se_theta5 <- sqrt(var_theta5)
+
+theta5<-c(theta_expr(vr),as.numeric(se_theta5))
+
+
+
+#theta6
+theta_expr <- function(vr){
+  sigma11 <- vr["sigma11"]
+  sigma12 <- vr["sigma12"]
+  sigma13 <- vr["sigma13"]
+  sigma22 <- vr["sigma22"]
+  sigma23 <- vr["sigma23"]
+  sigma33 <- vr["sigma33"]
+  
+  # Compute standard deviations
+  s1 <- sqrt(sigma11)
+  s2 <- sqrt(sigma22)
+  s3 <- sqrt(sigma33)
+  
+  # Correlations
+  r12 <- sigma12 / (s1 * s2)
+  r13 <- sigma13 / (s1 * s3)
+  r23 <- sigma23 / (s2 * s3)
+  
+  # Correlation matrix
+  R <- matrix(c(1,   r12, r13,
+                r12, 1,   r23,
+                r13, r23, 1), nrow=3, byrow=TRUE)
+  
+  # Cholesky factor (lower triangular)
+  L <- t(chol(R))
+  
+  # Compute the theta parameters
+  theta0 <- L[2,1] / L[2,2]
+  theta1 <- L[3,1] / L[3,3]
+  theta2 <- L[3,2] / L[3,3]
+  theta2
+}
+grad <- grad(func = theta_expr, x = vr)
+var_theta6 <- t(grad) %*% vrv %*% grad
+se_theta6 <- sqrt(var_theta6)
+
+theta6<-c(theta_expr(vr),as.numeric(se_theta6))
+
+
+#theta7
+vr<-c(VarCorr(mod)$grouping2) 
+
+
+vrv<-vv[10,10,drop=FALSE]
+
+names(vr)<-colnames(vrv)<-rownames(vrv)<-c("sigma11")
+
+
+theta_expr <- function(vr){
+  sigma11 <- vr["sigma11"]
+  
+  # Compute standard deviations
+  s1 <- sqrt(sigma11)
+  log(s1)
+}
+grad <- grad(func = theta_expr, x = vr)
+var_theta7 <- t(grad) %*% vrv %*% grad
+se_theta7 <- sqrt(var_theta7)
+
+theta7<-c(theta_expr(vr),as.numeric(se_theta7))
+
+#residual
+
+st<-summary(mod)$sigma**2
+vst<-vv[11,11,drop=FALSE]
+names(st)<-colnames(vst)<-rownames(vst)<-"sigma1"
+
+s11<-deltaMethod(st,"log(sqrt(sigma1))",vst)
+
+theta_expr <- function(vr){
+  sigma11 <- vr["sigma1"]
+  
+  # Compute standard deviations
+  s1 <- sqrt(sigma11)
+  log(s1)
+}
+grad <- grad(func = theta_expr, x = st)
+var_disp <- t(grad) %*% vst %*% grad
+se_disp <- sqrt(var_disp)
+
+disp<-c(theta_expr(st),as.numeric(se_disp))
+
+
+
+est<-c(fixef(fit_bglmer),disp[1],
+       c(theta1[1],theta2[1],theta3[1],theta4[1],theta5[1],theta6[1],theta7[1]) 
+)
+ses<-c(sqrt(diag(vcov(fit_bglmer))),disp[2],
+       c(theta1[2],theta2[2],theta3[2],theta4[2],theta5[2],theta6[2],theta7[2])
+)
+
+res<-cbind(est,ses,est-qnorm(0.975)*ses,est+qnorm(0.975)*ses)
+colnames(res)<-c("Estimate","SE","CI_low","CI_up")
+
+df <- as.data.frame(res)
+df$Coefficient <- df_ml$Coefficient 
+#df$group<-factor(ifelse(df$Coefficient%in%c("theta5","theta6"),1,2))
+df$Method="BM"
+
+df_bm<-df
+
+df_all <- bind_rows(df_ml, df_reml, df_pml, df_bm)
+df_all$Coefficient<-as.character(df_all$Coefficient)
+#df_all$Coefficient[df_all$Coefficient%in%paste0("theta",1:7)]<-paste0("  ",as.character(df_all$Coefficient[df_all$Coefficient%in%paste0("theta",1:7)]))
+df_all$Coefficient<-factor(df_all$Coefficient)
+df_all$Method<-factor(df_all$Method,levels=c("ML","REML","PML","BM"))
+
+
+
+signed_log <- function(x,a=1/10) {
+  #sign(x) * log10(abs(x) + 1)
+  #asinh(x/a)
+  #sign(x) * abs(x)^a
+  x
+}
+
+
+df_all$Coef2<-as.character(df_all$Coefficient)
+df_all$Coef2[df_all$Coef2=="betadisp"]<-"dispersion"
+
+
+
+
+plot_coefs<-ggplot(df_all, 
+                   aes(y = Method, x = signed_log(Estimate), color = Method)) +
+  geom_pointrange(aes(xmin = signed_log(CI_low), xmax = signed_log(CI_up))) +
+  scale_color_manual(values = dfpallete) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "darkgray") +
+  facet_grid(Coef2 ~ ., scales = "free_y", switch = "y") + 
+  theme_minimal() +
+  theme(
+    strip.placement = "outside",
+    strip.text.y.left = element_text(angle = 0),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    legend.position = "right",
+    panel.spacing.y = unit(0.5, "cm"),
+    panel.grid.major.y = element_blank(),    
+    panel.grid.minor.y = element_blank(), 
+    panel.grid.major.x = element_blank(),    
+    panel.grid.minor.x = element_blank()      
+  ) +
+  labs(x = "Estimate with 95% CI", y = "Coefficients", color = NULL) +
+  coord_cartesian(xlim = c(-5, 5))
+
+
+
+
+
+
+####get predictions with 95% confidence intervals 
+#maybe we would need to avoid boot, since we did not evaluate this in sims, wald could maybe be justified?
+#note: this are not prediction intervals (ie our uncertanty about the individual value), but CI for the mean predicted response (not for individual observation)
+
+#make a new df for which predictions are to be calculated
+
+#prediction intervals, for each method to show that (if) they are of different widths
+
+
+
+tau<-opt_tau_ml$root
+D_est<-D
+q<-ncol(D_est)
+ee<-eigen(D_est)
+ee$values[ee$values<1e-4]<-1e-4
+ee$values[ee$values>1e4]<-1e4
+lm<-mean(ee$values)
+li<-ee$values+tau*(lm-ee$values)
+psi<-ee$vectors%*%diag(li)%*%t(ee$vectors)*3*q
+
+nu=2*q-1
+
+pd1<-make_pseudo_data_rand_eigen_general_psi_v3_glmm(psi,nu,const=1e8,param="variance",link_fun=function(x) x  )
+
+
+Xa<-rbind(xdf$X,matrix(0,ncol=ncol(xdf$X),nrow=nrow(pd1$data$Z)))
+Z1a<-rbind(xdf$Z1,pd1$data$Z)
+Z2a<-rbind(xdf$Z2,matrix(0,ncol=ncol(xdf$Z2),nrow=nrow(pd1$data$Z)))
+
+
+Ya<-c(xdf$Y,pd1$data$Y)
+weightsa<-c(rep(1,length(xdf$Y)),pd1$data$nn)
+
+
+grouping1a<-c(xdf$grouping1,max(xdf$grouping1)+pd1$data$grouping)
+grouping2a<-c(xdf$grouping2,max(xdf$grouping2)+pd1$data$grouping)
+
+
+
+
+xdfa<-list(Y=Ya,weights=weightsa,X=Xa,Z1=Z1a,Z2=Z2a,grouping1=grouping1a,grouping2=grouping2a)
+
+
+xdfadf<-data.frame(Y=xdfa$Y,X=xdfa$X,Z1=xdfa$Z1,Z2=xdfa$Z2,gr1=xdfa$grouping1,gr2=xdfa$grouping2,w=xdfa$weights)
+
+
+
+
+newtime=seq(from=-5,to=5,by=0.01)
+
+newx<-data.frame(X..Intercept.=1,X.water.z=newtime,
+                 X.I.water.z.2.=newtime**2,
+                 Z1..Intercept.=1,
+                 Z1.water.z=newtime,
+                 Z1.I.water.z.2.=newtime**2,
+                 gr1=4,
+                 Z2=1,
+                 gr2=1,
+                 w=1,
+                 x=newtime
+)
+
+#PML
+
+tmp2 <- glmmTMB(Y~-1+X..Intercept.+X.water.z+X.I.water.z.2.+
+                  (-1+Z1..Intercept.+Z1.water.z+Z1.I.water.z.2.|gr1)+
+                  (-1+Z2|gr2), family = gaussian(link = "identity"),
+                dispformula = ~offset(-log(w)),
+                data=xdfadf)
+
+preds<-predict(tmp2,newdata=newx, re.form = NULL,se.fit=TRUE)
+
+results <- cbind(
+  
+  Predicted = preds$fit,
+  Lower = preds$fit-qnorm(0.975)*preds$se.fit,
+  Upper = preds$fit+qnorm(0.975)*preds$se.fit
+)
+
+predint_pml<-cbind(newx,results)  
+
+
+#ML
+
+tmp2 <- glmmTMB(Y~-1+X..Intercept.+X.water.z+X.I.water.z.2.+
+                  (-1+Z1..Intercept.+Z1.water.z+Z1.I.water.z.2.|gr1)+
+                  (-1+Z2|gr2), family = gaussian(link = "identity"),
+                
+                data=xdfadf[1:nrow(xdf$X),])
+
+preds<-predict(tmp2,newdata=newx, re.form = NULL,se.fit=TRUE)
+
+results <- cbind(
+  
+  Predicted = preds$fit,
+  Lower = preds$fit-qnorm(0.975)*preds$se.fit,
+  Upper = preds$fit+qnorm(0.975)*preds$se.fit
+)
+
+predint_ml<-cbind(newx,results)  
+
+
+#REML
+
+tmp2 <- glmmTMB(Y~-1+X..Intercept.+X.water.z+X.I.water.z.2.+
+                  (-1+Z1..Intercept.+Z1.water.z+Z1.I.water.z.2.|gr1)+
+                  (-1+Z2|gr2), family = gaussian(link = "identity"),
+                REML=TRUE,
+                data=xdfadf[1:nrow(xdf$X),])
+
+preds<-predict(tmp2,newdata=newx, re.form = NULL,se.fit=TRUE)
+
+results <- cbind(
+  
+  Predicted = preds$fit,
+  Lower = preds$fit-qnorm(0.975)*preds$se.fit,
+  Upper = preds$fit+qnorm(0.975)*preds$se.fit
+)
+
+predint_reml<-cbind(newx,results)  
+
+#BM
+tmp2 <- blmer(Y~-1+X..Intercept.+X.water.z+X.I.water.z.2.+
+                (-1+Z1..Intercept.+Z1.water.z+Z1.I.water.z.2.|gr1)+
+                (-1+Z2|gr2) ,
+              
+              data=xdfadf[1:nrow(xdf$X),])
+
+#newx$gr1<-factor(newx$gr1,levels=levels(factor(xdf$grouping1)))
+#newx$gr2<-factor(newx$gr2,levels=levels(factor(xdf$grouping2)))
+
+#preds<-predict(tmp2,newdata=newx, re.form = NULL,se.fit=TRUE)
+#note that this gives error due to a bug: https://github.com/lme4/lme4/issues/815
+#we need all levels of clusters to be present!
+
+zz=0
+for (gr1 in unique(xdf$grouping1)){
+  for (gr2 in unique(xdf$grouping2)){
+    zz=zz+1
+    new_i<-newx[,c(1:6,8,10:11)]
+    new_i$gr1<-gr1
+    new_i$gr2<-gr2
+    if (zz==1) new_blmer<-new_i else new_blmer<-rbind(new_blmer,new_i)
+  }
+}
+preds<-predict(tmp2,newdata=new_blmer, re.form = NULL,se.fit=TRUE)
+
+
+results <- cbind(
+  
+  Predicted = preds$fit,
+  Lower = preds$fit-qnorm(0.975)*preds$se.fit,
+  Upper = preds$fit+qnorm(0.975)*preds$se.fit
+)
+
+predint_bm<-cbind(newx,results[which(new_blmer$gr1==4&new_blmer$gr2==1),])
+
+
+
+
+predint_bm$Method<-"BM"
+predint_ml$Method<-"ML"
+predint_reml$Method<-"REML"
+predint_pml$Method<-"PML"
+
+res_a<-rbind(predint_ml,predint_reml,predint_pml,predint_bm)
+
+res_a$Method<-factor(res_a$Method,levels=c("ML","REML","PML","BM"))
+
+dfpallete<-c("black","red","blue","cadetblue")
+
+
+
+plot_pred<-ggplot(res_a, aes(x = x, y = Predicted, color = Method, fill = Method)) +
+  geom_ribbon(aes(ymin = Lower, ymax = Upper), alpha = 0.15, color = NA) +
+  geom_line(size = 1,alpha=0.7) +
+  theme_minimal() +
+  scale_color_manual(values = dfpallete) +
+  scale_fill_manual(values = dfpallete) +
+  labs(x = "Groundwater depth (standardized)", y = "Predicted log-transformed yield (with 95% confidence interval for the mean response)")+
+  guides(color = guide_legend(title = NULL), fill = guide_legend(title = NULL))
+
+
+
+
+###combine coefs and predictions
+pdf("fig_elenberg_coefs.pdf",height=8,width=15)
+grid.arrange(plot_coefs,plot_pred,nrow=1)
+dev.off()
+
+
+
+
+##Model diagnostics
+
+#C_thetai=(hatthtea_i-hattheta)^t cov(hattheta)^-1 (hatthtea_i-hattheta), where theta q-vector (we work at the scale of internal parametrization)
+#to do this, we need hattheta_i, ie the estimate when i is ommited
+
+#PML
+
+vr<-fit_tau_ml$sdr$cov.fixed[5:10,5:10] #cov
+est<-fit_tau_ml$sdr$par.fixed[5:10] #hattheta
+
+
+esti<-list()
+for (i in 1:6){
+  
+  omit_idx<-which(xdfa$grouping1==i)
+  xdfs<- lapply(xdfa, function(x) {
+    if (is.vector(x) && !is.matrix(x)) {
+      x[-omit_idx]
+    } else if (is.matrix(x)) {
+      x[-omit_idx, , drop = FALSE]
+    } else {
+      x
+    }
+  })
+  fit_a<-glmmTMB(Y~-1+X+(-1+Z1|grouping1)+(-1+Z2|grouping2), family = gaussian(link = "identity"),
+                 dispformula = ~offset(-log(weights)),
+                 data=xdfs)
+  esti[[i]]<-fit_a$sdr$par.fixed[5:10]
+}
+cooki<-list()
+for (i in 1:6) cooki[[i]]<-(esti[[i]]-est)%*%solve(vr)%*%matrix(esti[[i]]-est,ncol=1)
+plot(unlist(cooki))
+
+# ML
+
+vr<-fit_glmer$sdr$cov.fixed[5:10,5:10] #cov
+est<-fit_glmer$sdr$par.fixed[5:10] #hattheta
+
+
+esti<-list()
+for (i in 1:6){
+  
+  omit_idx<-which(xdf$grouping1==i)
+  xdfs<- lapply(xdf, function(x) {
+    if (is.vector(x) && !is.matrix(x)) {
+      x[-omit_idx]
+    } else if (is.matrix(x)) {
+      x[-omit_idx, , drop = FALSE]
+    } else {
+      x
+    }
+  })
+  fit_a<-glmmTMB(Y~-1+X+(-1+Z1|grouping1)+(-1+Z2|grouping2), family = gaussian(link = "identity"),
+                 
+                 data=xdfs)
+  esti[[i]]<-fit_a$sdr$par.fixed[5:10]
+}
+cookio<-list()
+for (i in 1:6) cookio[[i]]<-(esti[[i]]-est)%*%solve(vr)%*%matrix(esti[[i]]-est,ncol=1)
+plot(unlist(cookio))
+
+#REML
+vr<-fit_glmer_r$sdr$cov.fixed[2:7,2:7] #cov
+est<-fit_glmer_r$sdr$par.fixed[2:7] #hattheta
+
+
+esti<-list()
+for (i in 1:6){
+  
+  omit_idx<-which(xdf$grouping1==i)
+  xdfs<- lapply(xdf, function(x) {
+    if (is.vector(x) && !is.matrix(x)) {
+      x[-omit_idx]
+    } else if (is.matrix(x)) {
+      x[-omit_idx, , drop = FALSE]
+    } else {
+      x
+    }
+  })
+  fit_a<-glmmTMB(Y~-1+X+(-1+Z1|grouping1)+(-1+Z2|grouping2), family = gaussian(link = "identity"),
+                 REML=TRUE,
+                 data=xdfs)
+  esti[[i]]<-fit_a$sdr$par.fixed[2:7]
+}
+cookior<-list()
+for (i in 1:6) cookior[[i]]<-(esti[[i]]-est)%*%solve(vr)%*%matrix(esti[[i]]-est,ncol=1)
+plot(unlist(cookior))
+
+#BML
+
+est<-getME(fit_bglmer, "theta")[1:6]
+
+hess<-fit_bglmer@optinfo$derivs$Hessian
+
+
+
+esti<-list()
+for (i in 1:6){
+  
+  omit_idx<-which(xdf$grouping1==i)
+  xdfs<- lapply(xdf, function(x) {
+    if (is.vector(x) && !is.matrix(x)) {
+      x[-omit_idx]
+    } else if (is.matrix(x)) {
+      x[-omit_idx, , drop = FALSE]
+    } else {
+      x
+    }
+  })
+  fit_a<-blmer(Y~X-1 +
+                 (Z1-1 | grouping1)+(Z2-1 | grouping2), data = xdfs)
+  esti[[i]]<-getME(fit_a, "theta")[1:6]
+}
+
+cookiobm<-list()
+for (i in 1:6) cookiobm[[i]]<-(esti[[i]]-est)%*%hess[1:6,1:6]%*%matrix(esti[[i]]-est,ncol=1)
+plot(unlist(cookiobm))
+
+cooks<-cbind(1:6,unlist(cookio),unlist(cookior),unlist(cooki),unlist(cookiobm))
+colnames(cooks)<-c("Species","ML","REML","PML","BM")
+
+#what about omitting each row (slow? okish)
+
+#PML
+vr<-fit_tau_ml$sdr$cov.fixed[5:10,5:10] #cov
+est<-fit_tau_ml$sdr$par.fixed[5:10] #hattheta
+
+
+esti<-list()
+for (i in 1:nrow(xdf$X)){
+  
+  omit_idx<-i
+  xdfs<- lapply(xdfa, function(x) {
+    if (is.vector(x) && !is.matrix(x)) {
+      x[-omit_idx]
+    } else if (is.matrix(x)) {
+      x[-omit_idx, , drop = FALSE]
+    } else {
+      x
+    }
+  })
+  fit_a<-glmmTMB(Y~-1+X+(-1+Z1|grouping1)+(-1+Z2|grouping2), family = gaussian(link = "identity"),
+                 dispformula = ~offset(-log(weights)),
+                 data=xdfs)
+  esti[[i]]<-fit_a$sdr$par.fixed[5:10]
+}
+cooki_i<-list()
+for (i in 1:nrow(xdf$X)) cooki_i[[i]]<-(esti[[i]]-est)%*%solve(vr)%*%matrix(esti[[i]]-est,ncol=1)
+plot(unlist(cooki_i),type="b")
+
+
+
+# ML
+
+vr<-fit_glmer$sdr$cov.fixed[5:10,5:10] #cov
+est<-fit_glmer$sdr$par.fixed[5:10] #hattheta
+
+
+esti<-list()
+for (i in 1:nrow(xdf$X)){
+  
+  omit_idx<-i
+  xdfs<- lapply(xdf, function(x) {
+    if (is.vector(x) && !is.matrix(x)) {
+      x[-omit_idx]
+    } else if (is.matrix(x)) {
+      x[-omit_idx, , drop = FALSE]
+    } else {
+      x
+    }
+  })
+  fit_a<-glmmTMB(Y~-1+X+(-1+Z1|grouping1)+(-1+Z2|grouping2), family = gaussian(link = "identity"),
+                 
+                 data=xdfs)
+  esti[[i]]<-fit_a$sdr$par.fixed[5:10]
+}
+cookio_i<-list()
+for (i in 1:nrow(xdf$X)) cookio_i[[i]]<-(esti[[i]]-est)%*%solve(vr)%*%matrix(esti[[i]]-est,ncol=1)
+plot(unlist(cookio_i),type="b")
+
+#REML
+vr<-fit_glmer_r$sdr$cov.fixed[2:7,2:7] #cov
+est<-fit_glmer_r$sdr$par.fixed[2:7] #hattheta
+
+
+esti<-list()
+for (i in 1:nrow(xdf$X)){
+  
+  omit_idx<-i
+  xdfs<- lapply(xdf, function(x) {
+    if (is.vector(x) && !is.matrix(x)) {
+      x[-omit_idx]
+    } else if (is.matrix(x)) {
+      x[-omit_idx, , drop = FALSE]
+    } else {
+      x
+    }
+  })
+  fit_a<-glmmTMB(Y~-1+X+(-1+Z1|grouping1)+(-1+Z2|grouping2), family = gaussian(link = "identity"),
+                 REML=TRUE,
+                 data=xdfs)
+  esti[[i]]<-fit_a$sdr$par.fixed[2:7]
+}
+cookior_i<-list()
+for (i in 1:nrow(xdf$X)) cookior_i[[i]]<-(esti[[i]]-est)%*%solve(vr)%*%matrix(esti[[i]]-est,ncol=1)
+plot(unlist(cookior_i),type="b")
+
+#BML
+
+est<-getME(fit_bglmer, "theta")[1:6]
+
+hess<-fit_bglmer@optinfo$derivs$Hessian
+
+
+
+esti<-list()
+for (i in 1:nrow(xdf$X)){
+  
+  omit_idx<-i
+  xdfs<- lapply(xdf, function(x) {
+    if (is.vector(x) && !is.matrix(x)) {
+      x[-omit_idx]
+    } else if (is.matrix(x)) {
+      x[-omit_idx, , drop = FALSE]
+    } else {
+      x
+    }
+  })
+  fit_a<-blmer(Y~X-1 +
+                 (Z1-1 | grouping1)+(Z2-1 | grouping2), data = xdfs)
+  esti[[i]]<-getME(fit_a, "theta")[1:6]
+}
+
+cookiobm_i<-list()
+for (i in 1:nrow(xdf$X)) cookiobm_i[[i]]<-(esti[[i]]-est)%*%hess[1:6,1:6]%*%matrix(esti[[i]]-est,ncol=1)
+plot(unlist(cookiobm_i))
+
+
+cooks_i<-cbind(1:nrow(xdf$X),unlist(cookio_i),unlist(cookior_i),unlist(cooki_i),unlist(cookiobm_i))
+colnames(cooks_i)<-c("Species","ML","REML","PML","BM")
+
+library(tidyverse)
+
+# Convert to data frame
+df_cooks <- as.data.frame(cooks_i)
+
+# Make sure Species is treated as a factor or integer
+df_cooks$Species <- as.integer(df_cooks$Species)
+
+# Reshape to long format: key = Method, value = Cook
+df_long <- df_cooks %>%
+  pivot_longer(cols = -Species, names_to = "Method", values_to = "Cook")
+
+df_long$Method <- factor(df_long$Method, levels = c("ML", "REML", "PML", "BM"))
+
+
+dfpallete<-c("black","red","blue","cadetblue")
+#cutoff <- qchisq(0.95, df = 6)
+
+p1<-ggplot(df_long, aes(x = Species, y = Cook, color = Method)) +
+  geom_point() +
+  geom_line() +
+  # geom_hline(yintercept = cutoff, linetype = "dashed", color = "darkgrey") +
+  facet_wrap(~ Method, scales = "free_y",nrow=1) +  
+  scale_color_manual(values = dfpallete) +
+  theme_minimal() +
+  labs(x = "Observation", y = "Cook's Distance") +
+  theme(legend.position = "none")+
+  scale_x_continuous(breaks = seq(from=0,by=20,to=200))
+
+#by cluster
+df_cookss <- as.data.frame(cooks)
+
+# Make sure Species is treated as a factor or integer
+df_cookss$Species <- as.integer(df_cookss$Species)
+
+# Reshape to long format: key = Method, value = Cook
+df_longs <- df_cookss %>%
+  pivot_longer(cols = -Species, names_to = "Method", values_to = "Cook")
+
+df_longs$Method <- factor(df_longs$Method, levels = c("ML", "REML", "PML", "BM"))
+
+p2<-ggplot(df_longs, aes(x = Species, y = Cook, color = Method)) +
+  geom_point() +
+  geom_line() +
+  # geom_hline(yintercept = cutoff, linetype = "dashed", color = "darkgrey") +
+  facet_wrap(~ Method, scales = "free_y",nrow=1) +  
+  scale_color_manual(values = dfpallete) +
+  theme_minimal() +
+  labs(x = "Species", y = "Cook's Distance") +
+  theme(legend.position = "none")+
+  scale_x_continuous(breaks = 1:6)
+
+library(gridExtra)
+
+pdf("fig_elenberg_cook.pdf",width = 15,height=10)
+grid.arrange(p1, p2, nrow = 2)
+dev.off()
+
+
+
+
+#####sum res, Table
+
+
 #####sum res
 
 #PML
