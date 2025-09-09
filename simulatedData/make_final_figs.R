@@ -1,3 +1,5 @@
+library(ggplot2)
+
 load("res_bin.Rdata")
 load("res_lin.Rdata")
 load("res_pois.Rdata")

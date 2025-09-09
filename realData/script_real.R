@@ -20,6 +20,9 @@ library(haven)
 
 library(tidyverse)
 
+library(ggplot2)
+
+library(gridExtra)
 
 ###aux functions for creating PD
 
@@ -138,6 +141,20 @@ ellenberg$gradient<-as.numeric(as.factor(ellenberg$gradient))
 
 
 ellenberg<-na.omit(ellenberg)
+g1<-ggplot(ellenberg, aes(x = water.z, y = log(Yi.g))) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "loess", se = TRUE, color = "blue",fill="lightblue") +
+  facet_wrap(~ Species) +
+  labs(
+    x = "water.s",
+    y = expression(log(Yi.g)) 
+  ) +
+  theme_minimal()
+
+ 
+pdf("building_1.pdf",height=6,width=8)
+g1
+dev.off()
 
 
 mod <- lmer(log(Yi.g) ~ water.z + I(water.z^2) +
@@ -254,7 +271,35 @@ opt_tau_ml<-uniroot(tau_finder_lin,c(0,1),xdf=xdf,D_est=VarCorr(fit_glmer)$cond$
 
 fit_tau_ml<-fiter_lin_tau(opt_tau_ml$root,D_est=VarCorr(fit_glmer)$cond$grouping1[1:3,1:3],xdf=xdf)
 
+plot_ml<-data.frame(fit=fitted(fit_glmer),res=residuals(fit_glmer))
+plot_ml$method="ML"
 
+plot_rml<-data.frame(fit=fitted(fit_glmer_r),res=residuals(fit_glmer_r))
+plot_rml$method="REML"
+
+plot_bml<-data.frame(fit=fitted(fit_bglmer),res=residuals(fit_bglmer))
+plot_bml$method="BM"
+
+plot_pml<-data.frame(fit=fitted(fit_tau_ml),res=residuals(fit_tau_ml))
+plot_pml$method="PML"
+
+plot_diag<-rbind(plot_ml,plot_bml,plot_rml,plot_pml[1:nrow(plot_ml),])
+
+tuk<-ggplot(plot_diag, aes(x = fit, y = res)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "loess", se = FALSE, color = "blue") +
+  facet_wrap(~ method) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  labs(
+    x = "Fitted values",
+    y = "Residuals" 
+    
+  ) +
+  theme_minimal()
+
+pdf("diag.pdf",height=6,width=6)
+tuk
+dev.off()
 
 ##plot coefs (at the internal scale!) with their Wald type CIs: you can make an argument that theta56 are unreasonable with ML/REML, further for theta456 you can get CIs; CIs for BM for some theta at this scale are very wide, resulting in very wide CIs 
 
