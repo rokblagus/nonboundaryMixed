@@ -36,22 +36,22 @@ make_pseudo_data_rand_eigen_general_psi_v3_glmm<-function(psi,nu,const=1e8,param
   if (param=="variance") cc<-(nu+q+1)/q
   
   cc<-max(c(floor(cc),1))
-   true<-psi/cc
+  true<-psi/cc
   ee<-eigen(true,TRUE)
   ui<-list()
   for (j in 1:q){
     ui[[j]]<-sqrt(ee$values[j])*ee$vectors[,j]
   }
   
-   pi<-list()
+  pi<-list()
   
   for (j in 1:length(ui)){
     I<-diag(rep(1,length(ui[[j]])))
-       pi[[j]]<-link_fun(I%*%matrix(ui[[j]],ncol=1))
+    pi[[j]]<-link_fun(I%*%matrix(ui[[j]],ncol=1))
   }
-    Y<-unlist(pi)
+  Y<-unlist(pi)
   
-   id<-rep(1:q,each=q)
+  id<-rep(1:q,each=q)
   n<-rep(const,length(id))
   
   Zi<-matrix(0,ncol=q,nrow=q)
@@ -73,9 +73,9 @@ make_pseudo_data_rand_eigen_general_psi_v3_glmm<-function(psi,nu,const=1e8,param
     }
   }
   
-    data0<-list(Y=Y,grouping=id,nn=n,Z=Z)
+  data0<-list(Y=Y,grouping=id,nn=n,Z=Z)
   
-   
+  
   list(data=data0) 
 }
 
@@ -151,7 +151,7 @@ g1<-ggplot(ellenberg, aes(x = water.z, y = log(Yi.g))) +
   ) +
   theme_minimal()
 
- 
+
 pdf("building_1.pdf",height=6,width=8)
 g1
 dev.off()
@@ -162,10 +162,10 @@ mod <- lmer(log(Yi.g) ~ water.z + I(water.z^2) +
             data=ellenberg)
 
 mod <- glmmTMB(log(Yi.g) ~ water.z + I(water.z^2) +
-              (water.z + I(water.z^2)|Species) + (1|gradient),
-            data=ellenberg,family = gaussian(link="identity"))
+                 (water.z + I(water.z^2)|Species) + (1|gradient),
+               data=ellenberg,family = gaussian(link="identity"))
 
- 
+
 Y<-log(ellenberg$Yi.g)
 X<-model.matrix(log(Yi.g) ~ water.z + I(water.z^2),data=ellenberg)
 Z1<-X
@@ -189,9 +189,47 @@ fit_glmer_r<-glmmTMB(Y~X-1 +
 
 
 
+####add a penalty also on the RE by gradient (added as a response to Ref1 during 2nd round of revision)
+
+make_pseudo_data_rand_eigen_inter_alpha_beta_lin<-function(alpha,beta,param="sigma2",const=1e8){
+  if (is.null(match.arg(param,c("psi","sigma2","logsigma2")))) stop("param needs to be one of: psi,sigma2,logsigma2")
+  
+  if (param=="psi") N<-max(c(floor(2*(alpha-1)),1))
+  if (param=="sigma2") N<-max(c(floor(2*(alpha+1)),1))
+  if (param=="logsigma2") N<-max(c(floor(2*(alpha)),1))
+  
+  var.int<-beta*2/N
+  fact<-N
+  
+  true=matrix(var.int,ncol=1,nrow=1)
+  
+  ee<-eigen(true,TRUE)
+  u1<-sqrt(ee$values[1])*ee$vectors[,1]
+  #u2<-sqrt(ee$values[2])*ee$vectors[,2]
+  
+  #matrix(u1,ncol=1)%*%matrix(u1,nrow=1)+matrix(u2,ncol=1)%*%matrix(u2,nrow=1)
+  
+  
+  pi0=u1[1]
+  
+  Y<-rep(c(pi0),fact) #the constant improves the convergence!
+  n<-rep(rep(const,1),fact)
+  id<-c(1:fact)
+  Z<-matrix(rep(1,fact),ncol=1)
+  data0<-list(Y=Y,grouping=id,nn=n,Z=Z)
+  
+  #fit0<-glmer(cbind(Y,nn-Y)~-1+(-1+Z|grouping),data=data0,family=binomial)
+  #est.vcv<-VarCorr(fit0)$grouping[1:2,1:2]
+  
+  list(data=data0)#,fit=fit0,vcv.re=est.vcv)
+}
+
+
+##add penalty on 2nd re
+
 ##using tau
 
-fiter_lin_tau<-function(tau,D_est,xdf){
+fiter_lin_tau<-function(tau,D_est,D_est2,xdf){
   q<-ncol(D_est)
   ee<-eigen(D_est)
   ee$values[ee$values<1e-4]<-1e-4
@@ -204,42 +242,51 @@ fiter_lin_tau<-function(tau,D_est,xdf){
   
   pd1<-make_pseudo_data_rand_eigen_general_psi_v3_glmm(psi,nu,const=1e8,param="variance",link_fun=function(x) x  )
   
+  alpha=0.5
+  beta=3/2*D_est2
   
-  Xa<-rbind(xdf$X,matrix(0,ncol=ncol(xdf$X),nrow=nrow(pd1$data$Z)))
-  Z1a<-rbind(xdf$Z1,pd1$data$Z)
-  Z2a<-rbind(xdf$Z2,matrix(0,ncol=ncol(xdf$Z2),nrow=nrow(pd1$data$Z)))
+  pd2<-make_pseudo_data_rand_eigen_inter_alpha_beta_lin(alpha,beta)
+  
+  Xa<-rbind(xdf$X,matrix(0,ncol=ncol(xdf$X),nrow=nrow(pd1$data$Z)+nrow(pd2$data$Z)))
+  Z1a<-rbind(xdf$Z1,pd1$data$Z,matrix(0,ncol=ncol(pd1$data$Z),nrow=nrow(pd2$data$Z)))
+  Z2a<-rbind(xdf$Z2,matrix(0,ncol=ncol(xdf$Z2),nrow=nrow(pd1$data$Z)),pd2$data$Z)
   
   
-  Ya<-c(xdf$Y,pd1$data$Y)
-  weightsa<-c(rep(1,length(xdf$Y)),pd1$data$nn)
+  Ya<-c(xdf$Y,pd1$data$Y,pd2$data$Y)
+  weightsa<-c(rep(1,length(xdf$Y)),pd1$data$nn,pd2$data$nn)
   
   
-  grouping1a<-c(xdf$grouping1,max(xdf$grouping1)+pd1$data$grouping)
-  grouping2a<-c(xdf$grouping2,max(xdf$grouping2)+pd1$data$grouping)
+  grouping1a<-c(xdf$grouping1,max(xdf$grouping1)+pd1$data$grouping,max(max(xdf$grouping1)+pd1$data$grouping)+pd2$data$grouping)
+  grouping2a<-c(xdf$grouping2,max(xdf$grouping2)+pd1$data$grouping,max(max(xdf$grouping2)+pd1$data$grouping)+pd2$data$grouping)
   
   
   
   
   xdfa<-list(Y=Ya,weights=weightsa,X=Xa,Z1=Z1a,Z2=Z2a,grouping1=grouping1a,grouping2=grouping2a)
-   
+  
   tmp2 <- glmmTMB(Y~-1+X+(-1+Z1|grouping1)+(-1+Z2|grouping2), family = gaussian(link = "identity"),
                   dispformula = ~offset(-log(weights)),
                   data=xdfa)
   
   
   tmp2
+  
+  
 }
+
+
+
 
 get_marLik_lin<-function(fited_model,xdf){
   
   tmp2<-fited_model
   
- 
+  
   
   tmp3<-glmmTMB(Y~-1+X+(-1+Z1|grouping1)+(-1+Z2|grouping2),data=xdf,family=gaussian(link = "identity"),
                 
                 start=list(beta=tmp2$sdr$par.fixed[which(names(tmp2$sdr$par.fixed)=="beta")],
-                           betad=tmp2$sdr$par.fixed[which(names(tmp2$sdr$par.fixed)=="betad")],
+                           betadisp=tmp2$sdr$par.fixed[which(names(tmp2$sdr$par.fixed)=="betadisp")],
                            theta=tmp2$sdr$par.fixed[which(names(tmp2$sdr$par.fixed)=="theta")]),
                 control = glmmTMBControl(optCtrl = list(iter.max=0, eval.max=0),rank_check ="skip",conv_check="skip")) #point estimates seem ok, but logLik is NA! They have a trick where they dont want to report loogLik if the model does not converge (which in our case defacto holds), but we can still accesss it via object$fit$objective which seems to give -loglik so it should be minimized
   
@@ -249,27 +296,67 @@ get_marLik_lin<-function(fited_model,xdf){
   
 }
 
-tau_finder_lin<-function(tau,xdf,D_est,fit_ml,alpha=0.05){
-  fit_tau<-fiter_lin_tau(tau,D_est,xdf)
+tau_finder_lin<-function(tau,xdf,D_est,D_est2,fit_ml,alpha=0.05){
+  fit_tau<-fiter_lin_tau(tau,D_est,D_est2,xdf)
   abs(get_marLik_lin(fit_tau,xdf)-get_marLik_lin(fit_ml,xdf))-qchisq(1-alpha,1)/2
 }
 
 D<-VarCorr(fit_glmer)$cond$grouping1[1:3,1:3]
 
-sek<-seq(from=0,to=0.5,by=0.05)
-y<-rep(NA,length(sek))
-zz=0
-for (i in sek){
-  zz=zz+1
-  y[zz]<-tau_finder_lin(i,xdf,VarCorr(fit_glmer)$cond$grouping1[1:3,1:3],fit_glmer)
-}
-plot(sek,y,type="l")
-abline(h=0)
+D2<-VarCorr(fit_glmer)$cond$grouping2[1,1] 
 
-opt_tau_ml<-uniroot(tau_finder_lin,c(0,1),xdf=xdf,D_est=VarCorr(fit_glmer)$cond$grouping1[1:3,1:3],
+opt_tau_ml<-uniroot(tau_finder_lin,c(0,1),xdf=xdf,D_est=D,D_est2=D2,
                     fit_ml=fit_glmer,alpha=0.05)
 
-fit_tau_ml<-fiter_lin_tau(opt_tau_ml$root,D_est=VarCorr(fit_glmer)$cond$grouping1[1:3,1:3],xdf=xdf)
+fit_tau_ml<-fiter_lin_tau(opt_tau_ml$root,D_est=D,D_est2=D2,xdf=xdf)
+
+
+#show PD
+
+D_est<-D
+
+tau=opt_tau_ml$root
+q<-ncol(D_est)
+ee<-eigen(D_est)
+ee$values[ee$values<1e-4]<-1e-4
+ee$values[ee$values>1e4]<-1e4
+lm<-mean(ee$values)
+li<-ee$values+tau*(lm-ee$values)
+psi<-ee$vectors%*%diag(li)%*%t(ee$vectors)*3*q
+
+nu=2*q-1
+
+pd1<-make_pseudo_data_rand_eigen_general_psi_v3_glmm(psi,nu,const=1e8,param="variance",link_fun=function(x) x  )
+
+alpha=0.5
+beta=3/2*D2
+
+pd2<-make_pseudo_data_rand_eigen_inter_alpha_beta_lin(alpha,beta)
+
+Xa<-rbind(xdf$X,matrix(0,ncol=ncol(xdf$X),nrow=nrow(pd1$data$Z)+nrow(pd2$data$Z)))
+Z1a<-rbind(xdf$Z1,pd1$data$Z,matrix(0,ncol=ncol(pd1$data$Z),nrow=nrow(pd2$data$Z)))
+Z2a<-rbind(xdf$Z2,matrix(0,ncol=ncol(xdf$Z2),nrow=nrow(pd1$data$Z)),pd2$data$Z)
+
+
+Ya<-c(xdf$Y,pd1$data$Y,pd2$data$Y)
+weightsa<-c(rep(1,length(xdf$Y)),pd1$data$nn,pd2$data$nn)
+
+
+grouping1a<-c(xdf$grouping1,max(xdf$grouping1)+pd1$data$grouping,max(max(xdf$grouping1)+pd1$data$grouping)+pd2$data$grouping)
+grouping2a<-c(xdf$grouping2,max(xdf$grouping2)+pd1$data$grouping,max(max(xdf$grouping2)+pd1$data$grouping)+pd2$data$grouping)
+
+ids<-(nrow(xdf$X)+1):length(Ya)
+
+data_pd<-data.frame("y"=round(c(pd1$data$Y,pd2$data$Y),2),"x0"=0,"x1"=0,"x2"=0,
+                    "z11"=c(pd1$data$Z[,1],rep(0,nrow(pd2$data$Z))),"z12"=c(pd1$data$Z[,2],rep(0,nrow(pd2$data$Z))),
+                    "z13"=c(pd1$data$Z[,3],rep(0,nrow(pd2$data$Z))),
+                    "z2"=c(rep(0,nrow(pd1$data$Z)),pd2$data$Z[,1]),
+                    "grouping1"=grouping1a[ids],
+                    "grouping2"=grouping2a[ids],"w"="1e+08")
+
+data_pdx<-xtable(data_pd,digits = c(0,2,0,0,0,0,0,0,0,0,0,0))
+print(data_pdx,include.rownames=FALSE)
+
 
 plot_ml<-data.frame(fit=fitted(fit_glmer),res=residuals(fit_glmer))
 plot_ml$method="ML"
@@ -433,7 +520,7 @@ theta_expr <- function(vr){
   #theta2 <- L[3,2] / L[3,3]
   log(s1)
 }
-grad <- grad(func = theta_expr, x = vr)
+grad <- numDeriv:::grad(func = theta_expr, x = vr)
 var_theta1 <- t(grad) %*% vrv %*% grad
 se_theta1 <- sqrt(var_theta1)
 
@@ -472,7 +559,7 @@ theta_expr <- function(vr){
   #theta2 <- L[3,2] / L[3,3]
   log(s2)
 }
-grad <- grad(func = theta_expr, x = vr)
+grad <- numDeriv:::grad(func = theta_expr, x = vr)
 var_theta2 <- t(grad) %*% vrv %*% grad
 se_theta2 <- sqrt(var_theta2)
 
@@ -511,7 +598,7 @@ theta_expr <- function(vr){
   #theta2 <- L[3,2] / L[3,3]
   log(s3)
 }
-grad <- grad(func = theta_expr, x = vr)
+grad <- numDeriv:::grad(func = theta_expr, x = vr)
 var_theta3 <- t(grad) %*% vrv %*% grad
 se_theta3 <- sqrt(var_theta3)
 
@@ -551,7 +638,7 @@ theta_expr <- function(vr){
   theta2 <- L[3,2] / L[3,3]
   theta0
 }
-grad <- grad(func = theta_expr, x = vr)
+grad <- numDeriv:::grad(func = theta_expr, x = vr)
 var_theta4 <- t(grad) %*% vrv %*% grad
 se_theta4 <- sqrt(var_theta4)
 
@@ -590,7 +677,7 @@ theta_expr <- function(vr){
   theta2 <- L[3,2] / L[3,3]
   theta1
 }
-grad <- grad(func = theta_expr, x = vr)
+grad <- numDeriv:::grad(func = theta_expr, x = vr)
 var_theta5 <- t(grad) %*% vrv %*% grad
 se_theta5 <- sqrt(var_theta5)
 
@@ -631,7 +718,7 @@ theta_expr <- function(vr){
   theta2 <- L[3,2] / L[3,3]
   theta2
 }
-grad <- grad(func = theta_expr, x = vr)
+grad <- numDeriv:::grad(func = theta_expr, x = vr)
 var_theta6 <- t(grad) %*% vrv %*% grad
 se_theta6 <- sqrt(var_theta6)
 
@@ -654,7 +741,7 @@ theta_expr <- function(vr){
   s1 <- sqrt(sigma11)
   log(s1)
 }
-grad <- grad(func = theta_expr, x = vr)
+grad <- numDeriv:::grad(func = theta_expr, x = vr)
 var_theta7 <- t(grad) %*% vrv %*% grad
 se_theta7 <- sqrt(var_theta7)
 
@@ -675,7 +762,7 @@ theta_expr <- function(vr){
   s1 <- sqrt(sigma11)
   log(s1)
 }
-grad <- grad(func = theta_expr, x = st)
+grad <- numDeriv:::grad(func = theta_expr, x = st)
 var_disp <- t(grad) %*% vst %*% grad
 se_disp <- sqrt(var_disp)
 
@@ -720,6 +807,7 @@ df_all$Coef2<-as.character(df_all$Coefficient)
 df_all$Coef2[df_all$Coef2=="betadisp"]<-"dispersion"
 
 
+dfpallete<-c("black","red","blue","cadetblue")
 
 
 plot_coefs<-ggplot(df_all, 
@@ -758,9 +846,9 @@ plot_coefs<-ggplot(df_all,
 #prediction intervals, for each method to show that (if) they are of different widths
 
 
-
-tau<-opt_tau_ml$root
 D_est<-D
+
+tau=opt_tau_ml$root
 q<-ncol(D_est)
 ee<-eigen(D_est)
 ee$values[ee$values<1e-4]<-1e-4
@@ -773,18 +861,22 @@ nu=2*q-1
 
 pd1<-make_pseudo_data_rand_eigen_general_psi_v3_glmm(psi,nu,const=1e8,param="variance",link_fun=function(x) x  )
 
+alpha=0.5
+beta=3/2*D2
 
-Xa<-rbind(xdf$X,matrix(0,ncol=ncol(xdf$X),nrow=nrow(pd1$data$Z)))
-Z1a<-rbind(xdf$Z1,pd1$data$Z)
-Z2a<-rbind(xdf$Z2,matrix(0,ncol=ncol(xdf$Z2),nrow=nrow(pd1$data$Z)))
+pd2<-make_pseudo_data_rand_eigen_inter_alpha_beta_lin(alpha,beta)
+
+Xa<-rbind(xdf$X,matrix(0,ncol=ncol(xdf$X),nrow=nrow(pd1$data$Z)+nrow(pd2$data$Z)))
+Z1a<-rbind(xdf$Z1,pd1$data$Z,matrix(0,ncol=ncol(pd1$data$Z),nrow=nrow(pd2$data$Z)))
+Z2a<-rbind(xdf$Z2,matrix(0,ncol=ncol(xdf$Z2),nrow=nrow(pd1$data$Z)),pd2$data$Z)
 
 
-Ya<-c(xdf$Y,pd1$data$Y)
-weightsa<-c(rep(1,length(xdf$Y)),pd1$data$nn)
+Ya<-c(xdf$Y,pd1$data$Y,pd2$data$Y)
+weightsa<-c(rep(1,length(xdf$Y)),pd1$data$nn,pd2$data$nn)
 
 
-grouping1a<-c(xdf$grouping1,max(xdf$grouping1)+pd1$data$grouping)
-grouping2a<-c(xdf$grouping2,max(xdf$grouping2)+pd1$data$grouping)
+grouping1a<-c(xdf$grouping1,max(xdf$grouping1)+pd1$data$grouping,max(max(xdf$grouping1)+pd1$data$grouping)+pd2$data$grouping)
+grouping2a<-c(xdf$grouping2,max(xdf$grouping2)+pd1$data$grouping,max(max(xdf$grouping2)+pd1$data$grouping)+pd2$data$grouping)
 
 
 
@@ -918,7 +1010,6 @@ res_a<-rbind(predint_ml,predint_reml,predint_pml,predint_bm)
 
 res_a$Method<-factor(res_a$Method,levels=c("ML","REML","PML","BM"))
 
-dfpallete<-c("black","red","blue","cadetblue")
 
 
 
@@ -1389,7 +1480,7 @@ res_ml<-resi
 
 
 ###REML
- 
+
 
 mod<-fit_glmer_r 
 
@@ -1542,6 +1633,7 @@ print(xtable(res),sanitize.text.function=function(x){x})
 
 
 
+
 ####poisson example 
 
  
@@ -1651,6 +1743,55 @@ opt_tau_ml<-uniroot(tau_finder_pois,c(0,1),xdf=xdf,D_est=D,
 
 fit_tau_ml<-fiter_pois_tau(opt_tau_ml$root,D_est=D,xdf=xdf)
 
+#show PD
+
+tau=opt_tau_ml$root
+D_est=D
+
+q<-ncol(D_est)
+ee<-eigen(D_est)
+ee$values[ee$values<1e-4]<-1e-4
+ee$values[ee$values>1e4]<-1e4
+lm<-mean(ee$values)
+li<-ee$values+tau*(lm-ee$values)
+psi<-ee$vectors%*%diag(li)%*%t(ee$vectors)*3*q
+
+nu=2*q-1
+
+pd2<-make_pseudo_data_rand_eigen_general_psi_v3_glmm(psi,nu,const=1e8,param="variance",link_fun=function(x) exp(x))
+
+pd2<-make_pseudo_data_rand_eigen_general_psi_v3_glmm(psi,nu,const=1e8,param="variance",link_fun=function(x) exp(x))
+
+Xa<-rbind(xdf$X,matrix(0,ncol=ncol(xdf$X),nrow=nrow(pd2$data$Z)))
+Z1a<-rbind(xdf$Z1,matrix(0,ncol=ncol(xdf$Z1),nrow=nrow(pd2$data$Z)))
+Z2a<-rbind(xdf$Z2,matrix(0,ncol=ncol(xdf$Z2),nrow=nrow(pd2$data$Z)))
+Z3a<-rbind(xdf$Z3,pd2$data$Z)
+
+Ya<-c(xdf$Y,pd2$data$Y)
+weightsa<-c(rep(1,length(xdf$Y)),pd2$data$nn)
+
+
+grouping1a<-c(xdf$grouping1,max(xdf$grouping1)+pd2$data$grouping)
+grouping2a<-c(xdf$grouping2,max(xdf$grouping2)+pd2$data$grouping)
+grouping3a<-c(xdf$grouping3,max(xdf$grouping3)+pd2$data$grouping)
+
+Ya2<-floor(Ya*weightsa)
+offset<-log(weightsa)
+
+
+xdfa<-list(Y=Ya2,ofset=offset,X=Xa,Z1=Z1a,Z2=Z2a,Z3=Z3a,grouping1=grouping1a,grouping2=grouping2a,grouping3=grouping3a)
+
+ids<-(nrow(xdf$X)+1):nrow(xdfa$X)
+
+data_pd<-data.frame("y"=xdfa$Y[ids],"offset"=round(xdfa$ofset[ids],2),"x0"=0,"x1"=0,"x2"=0,"x3"=0,
+                    "z1"=0,"z2"=0,
+                    "z31"=xdfa$Z3[ids,1],"z32"=xdfa$Z3[ids,2],"z33"=xdfa$Z3[ids,3],
+                    "id1"=xdfa$grouping1[ids],"id2"=xdfa$grouping2[ids],"id3"=xdfa$grouping3[ids])
+
+
+data_pdx<-xtable(data_pd,digits = c(0,0,2,rep(0,12)))
+
+print(data_pdx,include.rownames=FALSE)
 
 #summarize the res
 
@@ -2028,6 +2169,19 @@ plot(sek,y,type="l")
 abline(h=0)
 #opt_tau can be set to 1 which gives the same res!
 opt_tau_ml$root<-1
+
+#show PD (only some colums for X!)
+
+ids<-(nrow(xdf$X)+1):nrow(xdfa$X)
+data_pd<-data.frame("y"=floor(xdfa$Y[ids]*xdfa$weights[ids]),"m"="1e+8","x0"=0,"x1"=0,"x14"=0,
+                    "z11"=xdfa$Z1[ids,1],"z12"=xdfa$Z1[ids,2],
+                    "z22"=0,"z21"=0,
+                    "id1"=xdfa$grouping1[ids],"id2"=xdfa$grouping2[ids])
+
+
+data_pdx<-xtable(data_pd,digits = 0)
+
+print(data_pdx,include.rownames=FALSE)
 
 
 #####get res

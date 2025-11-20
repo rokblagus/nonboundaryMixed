@@ -22,7 +22,48 @@ make_scripts.R: running this scipt produces script_i.R, i in 1,...,40 in folder 
 read_res_bin.R: running this script reads all results (the txt files resulting from runing script_i.R, i in 1,...,40 in folder ./bin/), produces the figures reported in Web Appendix G.II, and saves the results for the binomial mixed model as res_bin.Rdata, used by  make_final_figs.R. Running this script requires the following R packages: ggplot2 and gridExtra.
 read_res_lmm.R: running this script reads all results (the txt files resulting from runing script_i.R, i in 1,...,40 in folder ./lmm/), produces the figures reported in Web Appendix G.I, and saves the results for the linear mixed model as res_lin.Rdata, used by  make_final_figs.R.  Running this script requires the following R packages: ggplot2 and gridExtra.
 read_res_pois.R running this script reads all results (the txt files resulting from runing script_i.R, i in 1,...,40 in folder ./pois/), produces the figures reported in Web Appendix G.III, and saves the results for the Poisson mixed model as res_pois.Rdata, used by  make_final_figs.R.
-source_fun.R: this script is used by script_i.R to perform 1000 simulation runs for the specified simulation scenario: this is the core function to reproduce the simulation study. Here, the data according to the specified scenario are created and different methods are used to estimate the model's parameters. The results for each simulation scenarion and method are saved as txt files, where rows correspond to different simulation runs, and columns to the estimated parameters. Running this script requires the following R packages: glmmTMB, mvtnorm, and blme. Changing the following line of the code (L 971): alpha=0.05, to alpha=0.01 and alpha=0.1, produces the results as discussed in Section 5. We performed this part of the analysis in the cluster of CentOS based containers, session info:
+source_fun.R: this script is used by script_i.R to perform 1000 simulation runs for the specified simulation scenario: this is the core function to reproduce the simulation study. Here, the data according to the specified scenario are created and different methods are used to estimate the model's parameters. The results for each simulation scenarion and method are saved as txt files, where rows correspond to different simulation runs, and columns to the estimated parameters. Running this script requires the following R packages: glmmTMB, mvtnorm, and blme. Changing the following line of the code (L 971): alpha=0.05, to alpha=0.01 and alpha=0.1, produces the results as discussed in Section 5. We performed this part of the analysis in the cluster of CentOS based containers, 
+
+session infor for real data illustration (performed on PC):
+R version 4.4.1 (2024-06-14 ucrt)
+Platform: x86_64-w64-mingw32/x64
+Running under: Windows 10 x64 (build 18363)
+
+Matrix products: default
+
+
+locale:
+[1] LC_COLLATE=English_Slovenia.utf8  LC_CTYPE=English_Slovenia.utf8    LC_MONETARY=English_Slovenia.utf8
+[4] LC_NUMERIC=C                      LC_TIME=English_Slovenia.utf8    
+
+time zone: Europe/Warsaw
+tzcode source: internal
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+ [1] blmeco_1.4      MASS_7.3-60.2   gridExtra_2.3   lubridate_1.9.4 forcats_1.0.0   stringr_1.5.1  
+ [7] dplyr_1.1.4     purrr_1.0.2     readr_2.1.5     tidyr_1.3.1     tibble_3.2.1    ggplot2_3.5.2  
+[13] tidyverse_2.0.0 haven_2.5.5     merDeriv_0.2-5  lavaan_0.6-19   sandwich_3.1-1  nonnest2_0.5-8 
+[19] car_3.1-3       carData_3.0-5   nlme_3.1-164    xtable_1.8-4    glmmTMB_1.1.11  blme_1.0-6     
+[25] lme4_1.1-35.5   Matrix_1.7-0   
+
+loaded via a namespace (and not attached):
+ [1] gtable_0.3.6        TMB_1.9.17          CompQuadForm_1.4.4  lattice_0.22-6      tzdb_0.5.0         
+ [6] numDeriv_2016.8-1.1 quadprog_1.5-8      vctrs_0.6.5         tools_4.4.1         Rdpack_2.6.4       
+[11] generics_0.1.4      stats4_4.4.1        pkgconfig_2.0.3     arm_1.14-4          RColorBrewer_1.1-3 
+[16] lifecycle_1.0.4     compiler_4.4.1      farver_2.1.2        mnormt_2.1.1        codetools_0.2-20   
+[21] Formula_1.2-5       crayon_1.5.3        pillar_1.11.0       nloptr_2.1.1        reformulas_0.4.1   
+[26] boot_1.3-30         abind_1.4-8         multcomp_1.4-28     tidyselect_1.2.1    stringi_1.8.4      
+[31] mvtnorm_1.2-5       gtsummary_2.4.0     labeling_0.4.3      splines_4.4.1       cowplot_1.2.0      
+[36] grid_4.4.1          cli_3.6.3           magrittr_2.0.3      dichromat_2.0-0.1   survival_3.6-4     
+[41] pbivnorm_0.6.0      TH.data_1.1-3       withr_3.0.2         scales_1.4.0        timechange_0.3.0   
+[46] estimability_1.5.1  emmeans_1.11.2      zoo_1.8-12          hms_1.1.3           coda_0.19-4.1      
+[51] rbibutils_2.2.16    mgcv_1.9-3          rlang_1.1.4         Rcpp_1.0.12         glue_1.8.0         
+[56] pkgload_1.4.0       rstudioapi_0.17.1   minqa_1.2.7         R6_2.6.1    
+
+session info for simulation study (performed on the cluster of CentOS based containers):
 R version 3.6.0 (2019-04-26)
 Platform: x86_64-redhat-linux-gnu (64-bit)
 Running under: CentOS Linux 7 (Core)
